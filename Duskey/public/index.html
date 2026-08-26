@@ -444,6 +444,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 }
 .legal-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; }
 .legal-modal {
+  position: relative;
   width: 100%; max-width: 680px;
   background: var(--surface); border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg); box-shadow: var(--shadow);
@@ -489,6 +490,52 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 .legal-doc .req p { margin: 4px 0; }
 .legal-doc .req b { color: var(--ink); }
 .legal-doc .doc-link { color: var(--accent); font-weight: 600; cursor: pointer; background: none; border: none; padding: 0; font: inherit; text-decoration: underline; }
+
+/* ---- список документов внутри кнопки «Политики» ---- */
+.legal-hub-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.legal-hub-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 13px 14px; text-align: left;
+  background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-md);
+  cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.legal-hub-item:hover { border-color: var(--line-strong); transform: translateX(2px); }
+.legal-hub-icon {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  display: flex; align-items: center; justify-content: center; color: var(--accent);
+}
+.legal-hub-icon svg { width: 16px; height: 16px; }
+.legal-hub-text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.legal-hub-text b { font-size: 0.87rem; color: var(--ink); font-weight: 700; }
+.legal-hub-text small { font-size: 0.76rem; color: var(--muted); line-height: 1.4; }
+.legal-hub-arrow { flex: 0 0 auto; width: 16px; height: 16px; color: var(--muted); }
+.legal-hub-arrow svg { width: 100%; height: 100%; }
+
+/* ---- кнопка возврата к списку документов ---- */
+.legal-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 16px; padding: 0; border: none; background: none;
+  color: var(--muted); font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+.legal-back:hover { color: var(--accent); }
+.legal-back svg { width: 13px; height: 13px; }
+
+/* ---- тонкий индикатор прокрутки справа: почти незаметен, показывает
+   в какой части документа находится читатель; появляется только когда
+   текст реально не помещается целиком ---- */
+.legal-progress {
+  position: absolute; right: 5px; width: 3px; bottom: 10px;
+  border-radius: var(--radius-pill); z-index: 1; pointer-events: none;
+  opacity: 0; transition: opacity 0.25s var(--ease);
+}
+.legal-progress.is-visible { opacity: 1; }
+.legal-progress-thumb {
+  width: 100%; min-height: 24px; border-radius: var(--radius-pill);
+  background: var(--ink-soft); opacity: 0.28;
+  transition: transform 0.1s linear, height 0.1s linear;
+}
 @media (max-width: 480px) {
   .legal-overlay { padding: 0; align-items: stretch; overflow: hidden; }
   .legal-modal {
@@ -593,10 +640,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
             <div>
                 <div class="footer-col-title">Документы</div>
                 <nav class="footer-links">
-                    <button type="button" data-doc="offer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Условия использования сайта</button>
-                    <button type="button" data-doc="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/></svg>Политика конфиденциальности</button>
-                    <button type="button" data-doc="terms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>Пользовательское соглашение</button>
-                    <button type="button" data-doc="refund"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Возврат и обмен</button>
+                    <button type="button" class="policies-btn" data-doc="hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>Политики</button>
                 </nav>
             </div>
             <div>
@@ -625,8 +669,39 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
             </button>
         </div>
         <div class="legal-modal-body" id="legalBody"></div>
+        <div class="legal-progress" id="legalProgress"><div class="legal-progress-thumb" id="legalProgressThumb"></div></div>
     </div>
 </div>
+
+<template id="tpl-hub">
+<div class="legal-doc legal-hub">
+    <h1>Политики</h1>
+    <p class="meta">Редакция от 27 августа 2026 г.</p>
+    <div class="notice">Duskey только запускается, поэтому реквизиты продавца в документах ниже помечены как заглушка и будут заполнены по мере роста проекта. Сам Сайт ничего не продаёт как посредник маркетплейсов и не хранит платёжные данные — приём оплаты и фактическое исполнение (зачисление Steam, а в будущем — Telegram Stars) выполняют сторонние сервисы <b>Antilopay</b> и <b>Fragment</b>.</div>
+    <div class="legal-hub-grid">
+        <button type="button" class="legal-hub-item" data-doc="offer">
+            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="legal-hub-text"><b>Условия использования сайта</b><small>Публичная оферта: как оформляется и оплачивается пополнение</small></span>
+            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
+        <button type="button" class="legal-hub-item" data-doc="privacy">
+            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/></svg></span>
+            <span class="legal-hub-text"><b>Политика конфиденциальности</b><small>Какие данные собираются и кому передаются при оплате</small></span>
+            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
+        <button type="button" class="legal-hub-item" data-doc="terms">
+            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+            <span class="legal-hub-text"><b>Пользовательское соглашение</b><small>Общие правила пользования Сайтом</small></span>
+            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
+        <button type="button" class="legal-hub-item" data-doc="refund">
+            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></span>
+            <span class="legal-hub-text"><b>Возврат и обмен</b><small>Когда положен возврат средств и как его оформить</small></span>
+            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
+    </div>
+</div>
+</template>
 
 <template id="tpl-offer">
 <div class="legal-doc">
@@ -1060,14 +1135,48 @@ function unlockBodyScroll() {
     window.scrollTo(0, legalScrollY);
 }
 
+const legalModalHead = document.querySelector('.legal-modal-head');
+const legalProgress = document.getElementById('legalProgress');
+const legalProgressThumb = document.getElementById('legalProgressThumb');
+
+// Тонкая полоска справа отражает позицию в открытом документе. Появляется,
+// только если текст реально длиннее видимой области — иначе просто не рендерится.
+function updateLegalProgress() {
+    const viewH = legalBody.clientHeight;
+    const contentH = legalBody.scrollHeight;
+    if (contentH <= viewH + 2) {
+        legalProgress.classList.remove('is-visible');
+        return;
+    }
+    legalProgress.classList.add('is-visible');
+    const headH = legalModalHead ? legalModalHead.offsetHeight : 0;
+    legalProgress.style.top = headH + 'px';
+    const trackH = legalProgress.clientHeight;
+    const thumbRatio = Math.min(1, viewH / contentH);
+    const thumbH = Math.max(24, thumbRatio * trackH);
+    const scrollRatio = legalBody.scrollTop / (contentH - viewH);
+    const thumbTop = scrollRatio * (trackH - thumbH);
+    legalProgressThumb.style.height = thumbH + 'px';
+    legalProgressThumb.style.transform = `translateY(${thumbTop}px)`;
+}
+
 function openLegal(docId) {
     const tpl = document.getElementById('tpl-' + docId);
     if (!tpl) return;
     legalBody.innerHTML = '';
+    if (docId !== 'hub') {
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'legal-back';
+        back.dataset.doc = 'hub';
+        back.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Все документы';
+        legalBody.appendChild(back);
+    }
     legalBody.appendChild(tpl.content.cloneNode(true));
     legalBody.scrollTop = 0;
     legalOverlay.classList.add('is-open');
     lockBodyScroll();
+    requestAnimationFrame(updateLegalProgress);
 }
 function closeLegal() {
     legalOverlay.classList.remove('is-open');
@@ -1077,12 +1186,15 @@ function closeLegal() {
 document.querySelectorAll('.footer-links [data-doc]').forEach((btn) => {
     btn.addEventListener('click', () => openLegal(btn.dataset.doc));
 });
-// links *inside* a document (e.g. the offer pointing at the refund policy)
-// use the same delegated handler so switching documents never closes the modal
+// links *inside* a document (e.g. the offer pointing at the refund policy,
+// hub items, the "all documents" back button) share one delegated handler
+// so switching documents never closes the modal
 legalBody.addEventListener('click', (e) => {
     const link = e.target.closest('[data-doc]');
     if (link) openLegal(link.dataset.doc);
 });
+legalBody.addEventListener('scroll', updateLegalProgress);
+window.addEventListener('resize', updateLegalProgress);
 legalClose.addEventListener('click', closeLegal);
 legalOverlay.addEventListener('click', (e) => { if (e.target === legalOverlay) closeLegal(); });
 document.addEventListener('keydown', (e) => {
