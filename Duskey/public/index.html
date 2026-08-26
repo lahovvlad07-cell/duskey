@@ -699,9 +699,6 @@ mark {
                         <input type="text" class="qb-input" id="qbInput" placeholder="">
                     </div>
                 </div>
-                <div class="qb-row qb-contact-row" id="qbContactRow">
-                    <input type="email" class="qb-input-plain" id="qbEmail" placeholder="Email для чека и связи">
-                </div>
                 <button type="button" class="qb-buy" id="qbBuy">Купить</button>
                 <p class="qb-status" id="qbStatus" aria-live="polite"></p>
             </div>
@@ -1061,16 +1058,10 @@ function qbSetStatus(message, kind) {
 async function handleSteamPurchase(amount) {
     const buyBtn = document.getElementById('qbBuy');
     const steamAccount = document.getElementById('qbInput').value.trim();
-    const email = document.getElementById('qbEmail').value.trim();
 
     if (!steamAccount) {
         qbSetStatus('Укажите логин Steam', 'error');
         document.getElementById('qbInput').focus();
-        return;
-    }
-    if (!email) {
-        qbSetStatus('Укажите email для чека и связи', 'error');
-        document.getElementById('qbEmail').focus();
         return;
     }
 
@@ -1094,7 +1085,7 @@ async function handleSteamPurchase(amount) {
         const createRes = await fetch('/steam/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ steam_account: steamAccount, topup_amount: amount, email }),
+            body: JSON.stringify({ steam_account: steamAccount, topup_amount: amount }),
         });
         const data = await createRes.json();
         if (!createRes.ok || !data.ok) {
@@ -1131,8 +1122,6 @@ function renderQuickBuy() {
     document.getElementById('qbInputWrap').querySelectorAll('svg').forEach(s => s.remove());
     document.getElementById('qbInputWrap').insertAdjacentHTML('afterbegin', product.icon);
 
-    // email нужен только там, где оплату реально обрабатывает наш бэкенд
-    document.getElementById('qbContactRow').hidden = !product.api;
     qbSetStatus('');
 
     qbSyncAmountUI();

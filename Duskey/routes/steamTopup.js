@@ -57,12 +57,19 @@ router.post('/steam/create', async (req, res) => {
   if (!steam_account || !topupAmountNum || topupAmountNum <= 0) {
     return res.status(400).json({ ok: false, error: 'Укажите steam_account и корректную сумму' });
   }
-  if (!email && !phone) {
-    return res.status(400).json({ ok: false, error: 'Укажите email или телефон для чека/связи' });
-  }
 
   const order_id = genOrderId();
   const amount = topupAmountNum; // без наценки; поменяйте формулу при необходимости
+
+  // Antilopay требует, чтобы customer содержал email или phone (иначе код
+  // ошибки 11 — "Данные Покупателя должны содержать phone или email"). Мы не
+  // спрашиваем контакт у покупателя на сайте, поэтому подставляем технический
+  // email на базе order_id — он не используется для реальной переписки, это
+  // просто формальное поле для API. Если реальный email/phone всё же пришёл
+  // (например, из другого клиента), используем его.
+  const technicalEmail = `order-${order_id}@${(() => {
+    try { return new URL(SITE_URL).hostname; } catch { return 'duskey.local'; }
+  })()}`;
 
   const payload = {
     project_identificator: PROJECT_ID,
@@ -75,8 +82,7 @@ router.post('/steam/create', async (req, res) => {
     success_url: `${SITE_URL}/steam/success?order_id=${order_id}`,
     fail_url: `${SITE_URL}/steam/fail?order_id=${order_id}`,
     customer: {
-      ...(email ? { email } : {}),
-      ...(phone ? { phone } : {}),
+      ...(phone ? { phone } : (email ? { email } : { email: technicalEmail })),
       ip: req.ip,
     },
   };
