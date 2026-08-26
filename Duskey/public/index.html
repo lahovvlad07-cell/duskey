@@ -470,7 +470,11 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 }
 .legal-close svg { width: 15px; height: 15px; }
 .legal-close:hover { background: var(--surface-alt); color: var(--ink); }
-.legal-modal-body { padding: 20px 22px 30px; max-height: 72vh; overflow-y: auto; }
+.legal-modal-body {
+  padding: 20px 22px 30px; max-height: 72vh; overflow-y: auto;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.legal-modal-body::-webkit-scrollbar { display: none; }
 .legal-doc h1 { font-size: 1.28rem; margin: 0 0 6px; }
 .legal-doc .meta { font-size: 0.76rem; color: var(--muted); margin-bottom: 6px; }
 .legal-doc .notice {
@@ -521,21 +525,6 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 }
 .legal-back:hover { color: var(--accent); }
 .legal-back svg { width: 13px; height: 13px; }
-
-/* ---- тонкий индикатор прокрутки справа: почти незаметен, показывает
-   в какой части документа находится читатель; появляется только когда
-   текст реально не помещается целиком ---- */
-.legal-progress {
-  position: absolute; right: 5px; width: 3px; bottom: 10px;
-  border-radius: var(--radius-pill); z-index: 1; pointer-events: none;
-  opacity: 0; transition: opacity 0.25s var(--ease);
-}
-.legal-progress.is-visible { opacity: 1; }
-.legal-progress-thumb {
-  width: 100%; min-height: 24px; border-radius: var(--radius-pill);
-  background: var(--ink-soft); opacity: 0.28;
-  transition: transform 0.1s linear, height 0.1s linear;
-}
 @media (max-width: 480px) {
   .legal-overlay { padding: 0; align-items: stretch; overflow: hidden; }
   .legal-modal {
@@ -669,7 +658,6 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
             </button>
         </div>
         <div class="legal-modal-body" id="legalBody"></div>
-        <div class="legal-progress" id="legalProgress"><div class="legal-progress-thumb" id="legalProgressThumb"></div></div>
     </div>
 </div>
 
@@ -677,7 +665,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 <div class="legal-doc legal-hub">
     <h1>Политики</h1>
     <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice">Duskey только запускается, поэтому реквизиты продавца в документах ниже помечены как заглушка и будут заполнены по мере роста проекта. Сам Сайт ничего не продаёт как посредник маркетплейсов и не хранит платёжные данные — приём оплаты и фактическое исполнение (зачисление Steam, а в будущем — Telegram Stars) выполняют сторонние сервисы <b>Antilopay</b> и <b>Fragment</b>.</div>
+    <div class="notice">Коротко: оплату принимает сам Duskey, а фактическое исполнение — зачисление Steam, а в будущем звёзд Telegram — берут на себя сторонние сервисы <b>Antilopay</b> и <b>Fragment</b>. Подробности — в документах ниже.</div>
     <div class="legal-hub-grid">
         <button type="button" class="legal-hub-item" data-doc="offer">
             <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
@@ -707,14 +695,14 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 <div class="legal-doc">
     <h1>Публичная оферта</h1>
     <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice"><b>Duskey — прямой продавец, без сторонних маркетплейсов.</b> Все товары на Сайте (пополнение Steam, а в будущем — звёзды Telegram) продаёт и исполняет непосредственно Владелец Сайта. Раздел «Звёзды Telegram» временно недоступен для покупки и отмечен как «скоро» — оферта распространяется на него с момента запуска продаж.</div>
+    <div class="notice">Duskey продаёт напрямую, без сторонних маркетплейсов: пополнение Steam, а в будущем — звёзды Telegram. Раздел «Звёзды Telegram» пока отмечен как «скоро» — оферта начнёт действовать на него с момента запуска продаж.</div>
 
     <h2>1. Термины</h2>
-    <p><b>Сайт</b> — Duskey и связанный с ним сервер. <b>Владелец Сайта</b> — лицо, указанное в реквизитах (п. 6), администрирующее Сайт и оказывающее описанные ниже услуги. <b>Пользователь</b> — любое лицо, использующее Сайт. <b>Модуль пополнения Steam</b> — раздел Сайта, где Владелец Сайта принимает оплату через платёжного провайдера Antilopay и инициирует зачисление средств на указанный Steam-аккаунт. <b>Модуль звёзд Telegram</b> — раздел Сайта, где в будущем будет продаваться пополнение звёзд Telegram через сервис Fragment; на дату этой редакции недоступен для покупки.</p>
+    <p><b>Сайт</b> — Duskey и связанный с ним сервер. <b>Владелец Сайта</b> — лицо, администрирующее Сайт и оказывающее описанные ниже услуги; контакты — п. 6. <b>Пользователь</b> — любое лицо, использующее Сайт. <b>Модуль пополнения Steam</b> — раздел Сайта, где Владелец Сайта принимает оплату через платёжного провайдера Antilopay и инициирует зачисление средств на указанный Steam-аккаунт. <b>Модуль звёзд Telegram</b> — раздел Сайта, где в будущем будет продаваться пополнение звёзд Telegram через сервис Fragment; на дату этой редакции недоступен для покупки.</p>
     <p>Начиная использовать Сайт, Пользователь подтверждает, что ознакомился с условиями настоящей оферты и принимает их в полном объёме. Нажатие кнопки «Купить» и переход к оплате в любом из модулей Сайта означает акцепт настоящей оферты и заключение договора возмездного оказания услуг между Пользователем и Владельцем Сайта.</p>
 
     <h2>2. Пополнение Steam: предмет и продавец услуги</h2>
-    <p>Владелец Сайта (реквизиты — п. 6) оказывает Пользователю возмездную услугу: приём оплаты и инициирование зачисления указанной суммы на баланс указанного Steam-аккаунта. Оплата принимается через платёжного провайдера <b>Antilopay</b> напрямую на Сайте; фактическое зачисление средств на баланс Steam выполняет Antilopay как оператор соответствующего сервиса пополнения.</p>
+    <p>Владелец Сайта оказывает Пользователю возмездную услугу: приём оплаты и инициирование зачисления указанной суммы на баланс указанного Steam-аккаунта. Оплата принимается через платёжного провайдера <b>Antilopay</b> напрямую на Сайте; фактическое зачисление средств на баланс Steam выполняет Antilopay как оператор соответствующего сервиса пополнения.</p>
 
     <h2>3. Пополнение Steam: порядок оформления и оплаты</h2>
     <ol>
@@ -723,7 +711,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
         <li>Договор считается исполненным Владельцем Сайта с момента подтверждения зачисления средств на указанный Steam-аккаунт (Callback-уведомление от Antilopay или подтверждение статуса «SUCCESS» при проверке заказа).</li>
         <li>Ответственность за правильность указанного логина Steam несёт Пользователь — Сайт не может отменить или перенаправить уже исполненное зачисление на другой аккаунт.</li>
     </ol>
-    <p>Зачисление на баланс аккаунта обычно происходит от нескольких минут до часа с момента подтверждения оплаты; при задержке свыше суток следует обратиться в поддержку Сайта (п. 7).</p>
+    <p>Зачисление на баланс аккаунта обычно происходит от нескольких минут до часа с момента подтверждения оплаты; при задержке свыше суток следует обратиться в поддержку Сайта (п. 6).</p>
 
     <h2>4. Звёзды Telegram: предмет услуги (раздел временно недоступен)</h2>
     <p>После запуска Владелец Сайта будет оказывать Пользователю возмездную услугу пополнения звёзд Telegram на указанный аккаунт через сервис <b>Fragment</b>. Условия оплаты, порядок оформления и продавец по этому модулю будут описаны в этом разделе перед запуском продаж; до этого момента кнопка покупки в модуле звёзд неактивна и оплата не принимается.</p>
@@ -731,16 +719,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
     <h2>5. Ответственность</h2>
     <p>Сайт предоставляется «как есть». Владелец Сайта отвечает за исполнение оказываемых им услуг (приём оплаты, инициирование зачисления) в пределах, установленных применимым законодательством о защите прав потребителей, но не отвечает за действия и работоспособность сервисов Steam/Valve, Telegram/Fragment и платёжных провайдеров как таковых.</p>
 
-    <h2>6. Реквизиты продавца</h2>
-    <div class="req">
-        <p><b>⚠️ Заполнить перед публикацией сайта.</b> Ниже должны быть реальные данные лица, зарегистрированного в Antilopay как продавец/мерчант — именно оно принимает оплату и оказывает услуги по разделам 2–4.</p>
-        <p><b>Наименование:</b> [ИП/Самозанятый/ООО — укажите полное наименование]</p>
-        <p><b>ИНН:</b> [укажите] &nbsp; <b>ОГРН/ОГРНИП:</b> [укажите, если применимо]</p>
-        <p><b>Юридический/фактический адрес:</b> [укажите]</p>
-        <p><b>Контакт для претензий:</b> [email или телефон]</p>
-    </div>
-
-    <h2>7. Возврат, изменение условий и контакты</h2>
+    <h2>6. Возврат, изменение условий и контакты</h2>
     <p>Правила возврата подробно описаны в отдельном документе «<button type="button" class="doc-link" data-doc="refund">Возврат и обмен</button>». Владелец Сайта вправе изменять настоящую оферту в любое время без отдельного уведомления — актуальная редакция всегда доступна на этой странице; для уже оплаченных заказов применяется редакция, действовавшая на момент оплаты.</p>
     <div class="req">
         <p><b>Поддержка Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
@@ -752,10 +731,10 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 <div class="legal-doc">
     <h1>Политика конфиденциальности</h1>
     <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice">Duskey — прямой продавец: все данные, которые Сайт собирает, он обрабатывает сам, без передачи на сторонние маркетплейсы. При обычном просмотре Сайт собирает только технические данные (п. 2); при оформлении пополнения Steam — дополнительно логин, email и IP-адрес (п. 3). Раздел «Звёзды Telegram» пока недоступен для покупки — сбор данных по нему начнётся только после запуска (п. 4).</div>
+    <div class="notice">Duskey всё обрабатывает сам — без передачи данных на сторонние маркетплейсы. При обычном просмотре собираются только технические данные (п. 2); при оформлении пополнения Steam — дополнительно логин, email и IP-адрес (п. 3). Раздел «Звёзды Telegram» пока недоступен для покупки — сбор данных по нему начнётся только после запуска (п. 4).</div>
 
     <h2>1. Общие положения</h2>
-    <p>Настоящая Политика (далее — «Политика») определяет порядок обработки персональных данных Пользователей на сайте Duskey (далее — «Сайт») в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных». Оператором персональных данных, обрабатываемых Сайтом (п. 2–4), является Владелец Сайта — реквизиты см. в п. 10.</p>
+    <p>Настоящая Политика (далее — «Политика») определяет порядок обработки персональных данных Пользователей на сайте Duskey (далее — «Сайт») в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных». Оператором персональных данных, обрабатываемых Сайтом (п. 2–4), является Владелец Сайта — контакты для обращений см. в п. 9.</p>
 
     <h2>2. Данные при обычном просмотре Сайта</h2>
     <table>
@@ -794,13 +773,6 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
     <p>Владелец Сайта вправе вносить изменения в настоящую Политику в любое время без отдельного уведомления. Актуальная редакция всегда доступна на этой странице.</p>
     <div class="req">
         <p><b>По вопросам обработки данных:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
-    </div>
-
-    <h2>10. Оператор персональных данных</h2>
-    <div class="req">
-        <p><b>⚠️ Заполнить перед публикацией сайта</b> — реквизиты того же лица, что указано в оферте (п. 6).</p>
-        <p><b>Наименование:</b> [ИП/Самозанятый/ООО — укажите полное наименование]</p>
-        <p><b>ИНН:</b> [укажите]</p>
     </div>
 </div>
 </template>
@@ -1135,31 +1107,6 @@ function unlockBodyScroll() {
     window.scrollTo(0, legalScrollY);
 }
 
-const legalModalHead = document.querySelector('.legal-modal-head');
-const legalProgress = document.getElementById('legalProgress');
-const legalProgressThumb = document.getElementById('legalProgressThumb');
-
-// Тонкая полоска справа отражает позицию в открытом документе. Появляется,
-// только если текст реально длиннее видимой области — иначе просто не рендерится.
-function updateLegalProgress() {
-    const viewH = legalBody.clientHeight;
-    const contentH = legalBody.scrollHeight;
-    if (contentH <= viewH + 2) {
-        legalProgress.classList.remove('is-visible');
-        return;
-    }
-    legalProgress.classList.add('is-visible');
-    const headH = legalModalHead ? legalModalHead.offsetHeight : 0;
-    legalProgress.style.top = headH + 'px';
-    const trackH = legalProgress.clientHeight;
-    const thumbRatio = Math.min(1, viewH / contentH);
-    const thumbH = Math.max(24, thumbRatio * trackH);
-    const scrollRatio = legalBody.scrollTop / (contentH - viewH);
-    const thumbTop = scrollRatio * (trackH - thumbH);
-    legalProgressThumb.style.height = thumbH + 'px';
-    legalProgressThumb.style.transform = `translateY(${thumbTop}px)`;
-}
-
 function openLegal(docId) {
     const tpl = document.getElementById('tpl-' + docId);
     if (!tpl) return;
@@ -1176,7 +1123,6 @@ function openLegal(docId) {
     legalBody.scrollTop = 0;
     legalOverlay.classList.add('is-open');
     lockBodyScroll();
-    requestAnimationFrame(updateLegalProgress);
 }
 function closeLegal() {
     legalOverlay.classList.remove('is-open');
@@ -1193,8 +1139,6 @@ legalBody.addEventListener('click', (e) => {
     const link = e.target.closest('[data-doc]');
     if (link) openLegal(link.dataset.doc);
 });
-legalBody.addEventListener('scroll', updateLegalProgress);
-window.addEventListener('resize', updateLegalProgress);
 legalClose.addEventListener('click', closeLegal);
 legalOverlay.addEventListener('click', (e) => { if (e.target === legalOverlay) closeLegal(); });
 document.addEventListener('keydown', (e) => {
