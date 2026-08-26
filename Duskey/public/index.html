@@ -387,25 +387,26 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 @media (max-width: 360px) { .trust-item span { display: none; } }
 
 /* ---------- Footer ---------- */
-.catalog-footer { border-top: 1px solid var(--line); padding: 22px 0 26px; margin-top: 12px; }
+.catalog-footer { border-top: 1px solid var(--line); padding: 26px 0 26px; margin-top: 12px; }
 
-.footer-bottom {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap;
+.footer-nav {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding-bottom: 20px; margin-bottom: 18px; border-bottom: 1px solid var(--line);
 }
-.footer-nav { display: flex; align-items: center; gap: 10px; order: 1; }
 .footer-nav a, .footer-nav button {
-  font-size: 0.78rem; font-weight: 600; color: var(--ink-soft);
+  font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
   background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
   text-decoration: none; transition: color 0.15s var(--ease);
 }
 .footer-nav a:hover, .footer-nav button:hover { color: var(--accent); }
 .footer-sep { color: var(--muted); font-size: 0.7rem; }
-.footer-copy { font-size: 0.68rem; color: var(--muted); order: 2; flex: 1 1 auto; text-align: center; }
-.to-top { order: 3; }
-@media (max-width: 560px) {
+
+.footer-bottom {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.footer-copy { font-size: 0.68rem; color: var(--muted); }
+@media (max-width: 480px) {
   .footer-bottom { justify-content: center; text-align: center; }
-  .footer-copy { order: 3; flex: 0 0 100%; }
-  .to-top { order: 2; }
 }
 .to-top {
   display: inline-flex; align-items: center; justify-content: center;
@@ -609,12 +610,12 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 
 <footer class="catalog-footer">
     <div class="container">
+        <nav class="footer-nav">
+            <button type="button" data-doc="hub">Политики</button>
+            <span class="footer-sep">·</span>
+            <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">Написать в поддержку</a>
+        </nav>
         <div class="footer-bottom">
-            <nav class="footer-nav">
-                <button type="button" data-doc="hub">Политики</button>
-                <span class="footer-sep">·</span>
-                <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">Написать в поддержку</a>
-            </nav>
             <p class="footer-copy">© 2026 Duskey. Все цены указаны в рублях РФ.</p>
             <button type="button" class="to-top" id="toTopBtn" aria-label="Наверх"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></button>
         </div>
