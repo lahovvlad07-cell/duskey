@@ -51,6 +51,10 @@ router.post('/steam/check-account', async (req, res) => {
 //    если хотите брать комиссию/наценку сверху, считайте amount здесь, а не
 //    на фронте (чтобы человек не мог подменить сумму оплаты в браузере).
 router.post('/steam/create', async (req, res) => {
+  // email/phone больше не собираются на нашей стороне (форма их не
+  // запрашивает — это дублировало то, что и так спросит сама Antilopay на
+  // странице оплаты). Если когда-нибудь понадобится передать их отсюда —
+  // просто прокиньте в body, код ниже их подхватит.
   const { steam_account, topup_amount, email, phone } = req.body || {};
 
   const topupAmountNum = Number(topup_amount);
@@ -60,16 +64,6 @@ router.post('/steam/create', async (req, res) => {
 
   const order_id = genOrderId();
   const amount = topupAmountNum; // без наценки; поменяйте формулу при необходимости
-
-  // Antilopay требует, чтобы customer содержал email или phone (иначе код
-  // ошибки 11 — "Данные Покупателя должны содержать phone или email"). Мы не
-  // спрашиваем контакт у покупателя на сайте, поэтому подставляем технический
-  // email на базе order_id — он не используется для реальной переписки, это
-  // просто формальное поле для API. Если реальный email/phone всё же пришёл
-  // (например, из другого клиента), используем его.
-  const technicalEmail = `order-${order_id}@${(() => {
-    try { return new URL(SITE_URL).hostname; } catch { return 'duskey.local'; }
-  })()}`;
 
   const payload = {
     project_identificator: PROJECT_ID,
@@ -82,7 +76,8 @@ router.post('/steam/create', async (req, res) => {
     success_url: `${SITE_URL}/steam/success?order_id=${order_id}`,
     fail_url: `${SITE_URL}/steam/fail?order_id=${order_id}`,
     customer: {
-      ...(phone ? { phone } : (email ? { email } : { email: technicalEmail })),
+      ...(email ? { email } : {}),
+      ...(phone ? { phone } : {}),
       ip: req.ip,
     },
   };

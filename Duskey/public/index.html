@@ -139,6 +139,31 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 .theme-toggle .knob svg { width: 12px; height: 12px; }
 :root[data-theme="light"] .theme-toggle .knob { transform: translateX(20px); }
 
+/* header actions group — theme toggle + Telegram-channel pill share the
+   same right-aligned slot, so top-row still only has two flex children */
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.tg-pill {
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 12px 0 9px; border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong); background: var(--surface-alt);
+  color: var(--ink); text-decoration: none; font-size: 0.78rem; font-weight: 600;
+  white-space: nowrap; flex-shrink: 0;
+  transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.tg-pill:hover { border-color: var(--accent); transform: translateY(-1px); }
+.tg-pill svg { width: 15px; height: 15px; color: #29a8e8; flex-shrink: 0; }
+.tg-pill .tg-pill-label { display: none; }
+@media (min-width: 420px) { .tg-pill .tg-pill-label { display: inline; } }
+
+/* footer "community" column pill — a slightly bigger, standalone version
+   used next to the Support/Docs columns */
+.tg-footer-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--ink-soft, var(--muted)); text-decoration: none; font-size: 0.85rem;
+}
+.tg-footer-link svg { width: 16px; height: 16px; color: #29a8e8; flex-shrink: 0; }
+.tg-footer-link:hover { color: var(--ink); }
+
 .catalog-header h1 { font-size: clamp(1.35rem, 3vw + 0.7rem, 1.7rem); font-weight: 700; margin-bottom: 9px; line-height: 1.3; }
 .catalog-header .sub { font-size: 0.85rem; color: var(--muted); max-width: 480px; line-height: 1.55; margin-bottom: 22px; }
 
@@ -147,22 +172,209 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 .top-row { animation: riseIn 0.5s var(--ease) both; }
 .catalog-header h1 { animation: riseIn 0.5s var(--ease) 0.06s both; }
 .catalog-header .sub { animation: riseIn 0.5s var(--ease) 0.12s both; }
+.search-wrap { animation: riseIn 0.5s var(--ease) 0.18s both; }
+
 /* ---------- Section eyebrows: consistent rhythm between blocks ---------- */
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .section-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
 .section-title { font-size: 1.05rem; font-weight: 700; margin-top: 3px; }
 
+/* ---------- Filter chips (now paired with the catalog grid below it) ---------- */
+.catalog-toolbar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.filter-scroll { position: relative; }
+.filter-row {
+  display: flex; flex-wrap: nowrap; gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none; -ms-overflow-style: none;
+  padding: 2px 22px 6px 2px;
+  scroll-padding-left: 2px;
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-row.is-grabbing { scroll-behavior: auto; cursor: grabbing; }
+.filter-chip {
+  flex: 0 0 auto; scroll-snap-align: start;
+  padding: 8px 15px; border-radius: var(--radius-pill);
+  font-size: 0.8rem; font-weight: 600;
+  border: 1px solid var(--line-strong); color: var(--ink-soft);
+  background: var(--surface);
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease);
+  white-space: nowrap;
+  animation: riseIn 0.4s var(--ease) both;
+}
+.filter-chip:hover { border-color: var(--accent); color: var(--ink); }
+.filter-chip.is-active { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+/* swipe hint — a small tab peeking off the right edge of the row,
+   built from the exact gradient used on every primary button on the
+   page (see .qb-buy / .btn-buy), so it reads as this product's own
+   accent color, not a generic UI arrow. Pulses briefly on first
+   appearance, then holds still — present, not nagging. */
+.filter-swipe-hint {
+  position: absolute; z-index: 4;
+  top: 2px; bottom: 6px; right: 0; width: 26px;
+  display: flex; align-items: center; justify-content: flex-end;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.5s var(--ease);
+}
+.filter-swipe-hint.is-visible { opacity: 1; visibility: visible; }
+.filter-swipe-hint .badge {
+  width: 22px; height: 34px;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(120deg, var(--accent) 0%, var(--accent-deep) 100%);
+  color: #fff; cursor: pointer;
+  box-shadow: var(--shadow), -4px 0 12px -6px color-mix(in srgb, var(--accent) 55%, transparent);
+  transition: width 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.filter-swipe-hint .badge:hover { width: 26px; }
+.filter-swipe-hint .badge:active { transform: scale(0.94); }
+.filter-swipe-hint .badge svg { width: 12px; height: 12px; flex-shrink: 0; }
+/* three nudges on first appearance, then it goes still — presence
+   without pestering. Re-armed each time updateFilterScrollUI adds
+   the class fresh via JS (see .is-nudging below). */
+.filter-swipe-hint.is-nudging .badge { animation: swipeNudge 1.1s ease-in-out 3; }
+@keyframes swipeNudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-3px); }
+}
+
+/* the popover that opens on tap — one short, informative line, then
+   gets out of the way */
+.filter-swipe-pop {
+  position: absolute; z-index: 6;
+  top: calc(100% + 9px); right: 0; width: 178px;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md); box-shadow: var(--shadow);
+  padding: 10px 11px;
+  opacity: 0; transform: translateY(-4px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.filter-swipe-pop.is-open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.filter-swipe-pop::before {
+  content: ''; position: absolute; top: -5px; right: 10px;
+  width: 9px; height: 9px; background: var(--surface);
+  border-left: 1px solid var(--line-strong); border-top: 1px solid var(--line-strong);
+  transform: rotate(45deg);
+}
+.filter-swipe-pop p { font-size: 0.78rem; line-height: 1.5; color: var(--ink-soft); margin-bottom: 9px; }
+.filter-swipe-pop p b { color: var(--ink); font-weight: 600; }
+.filter-swipe-pop button {
+  width: 100%; padding: 7px; border-radius: var(--radius-pill);
+  background: var(--accent-tint); color: var(--accent-deep);
+  font-size: 0.76rem; font-weight: 700; text-align: center;
+  transition: background 0.15s var(--ease);
+}
+.filter-swipe-pop button:hover { background: color-mix(in srgb, var(--accent-tint) 70%, var(--accent) 30%); }
+
+/* ---------- Search ---------- */
+.search-wrap { position: relative; display: flex; align-items: center; margin-bottom: 14px; }
+.search-wrap svg { position: absolute; left: 14px; width: 17px; height: 17px; color: var(--muted); pointer-events: none; }
+.search-input {
+  width: 100%; padding: 12px 14px 12px 40px; border-radius: var(--radius-md);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-family: var(--font-body); font-size: 0.86rem;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-input:focus { outline: none; border-color: var(--accent); }
+.search-clear {
+  position: absolute; right: 8px; width: 26px; height: 26px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  color: var(--muted); background: var(--surface-alt);
+}
+.search-clear.is-visible { display: flex; }
+.search-clear:hover { color: var(--ink); }
+.search-clear svg { position: static; width: 13px; height: 13px; color: inherit; }
+.search-kbd {
+  position: absolute; right: 10px;
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); background: var(--surface-alt); border: 1px solid var(--line-strong);
+  padding: 2px 7px; border-radius: 6px; line-height: 1.4;
+  pointer-events: none;
+}
+.search-kbd.is-hidden { display: none; }
+mark {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: inherit; border-radius: 3px; padding: 0 1px;
+}
+.catalog-empty {
+  grid-column: 1 / -1;
+  text-align: center; padding: 40px 16px;
+  color: var(--muted); font-size: 0.86rem;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.catalog-empty svg { width: 30px; height: 30px; color: var(--muted); opacity: 0.7; }
+
 /* ---------- Quick-buy widget: the thing that greets you first ---------- */
 .quickbuy-section { padding: 18px 0 4px; }
 .quickbuy-card {
+  position: relative;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background: var(--surface);
   overflow: hidden;
   box-shadow: var(--shadow);
   animation: riseIn 0.55s var(--ease) 0.24s both;
+  transition: box-shadow 0.3s var(--ease);
+}
+/* тонкая брендовая полоса сверху — тот же приём, что и card-accent у
+   карточек ниже, но здесь она сигнализирует "это главный, самый
+   действенный блок на странице", а не категорию товара */
+.quickbuy-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--coral));
+}
+.quickbuy-card.is-pinged { animation: pingGlow 1.6s var(--ease); }
+@keyframes pingGlow {
+  0%   { box-shadow: var(--shadow), 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  25%  { box-shadow: var(--shadow), 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); }
+  100% { box-shadow: var(--shadow), 0 0 0 0 transparent; }
 }
 .qb-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* "умный" блок над каталогом: поиск понял (точно или по нечёткому
+   совпадению — опечатки вроде "телграм звды"), что искомое живёт в блоке
+   быстрой покупки выше, и предлагает сразу туда перейти. Карточек тут
+   ровно столько, сколько вообще есть товаров с быстрой покупкой (Steam,
+   TG Stars) — максимум 2, никогда весь каталог. */
+.qb-suggest {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 16px;
+}
+.qb-suggest[hidden] { display: none; }
+.qb-suggest-card {
+  flex: 1 1 240px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  animation: riseIn 0.35s var(--ease) both;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.qb-suggest-card:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.qb-suggest-icon { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+.qb-suggest-icon svg { width: 100%; height: 100%; }
+.qb-suggest-text { flex: 1; font-size: 0.86rem; line-height: 1.4; }
+.qb-suggest-text b { color: var(--ink); }
+.qb-suggest-btn {
+  flex-shrink: 0; padding: 8px 14px; border-radius: var(--radius-pill);
+  background: var(--accent); color: #fff; font-weight: 600; font-size: 0.82rem;
+  white-space: nowrap; pointer-events: none; /* клик обрабатывает вся карточка */
+}
+@media (max-width: 480px) {
+  .qb-suggest-card { flex-basis: 100%; }
+}
 
 /* segmented control — one grooved track, the active side is a solid
    pill that always fills its half evenly, so it never looks like it's
@@ -236,10 +448,18 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
   min-height: 48px; border-radius: var(--radius-md);
   background: linear-gradient(120deg, var(--accent) 0%, var(--accent-deep) 100%);
   color: #fff; font-weight: 700; font-size: 0.92rem;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
   transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
   box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 .qb-buy:hover { transform: translateY(-1px); }
+.qb-buy:active:not([disabled]) { transform: translateY(0) scale(0.98); }
+.qb-spinner {
+  width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff;
+  animation: qbSpin 0.7s linear infinite;
+}
+@keyframes qbSpin { to { transform: rotate(360deg); } }
 
 /* email/контакт для чека — та же "полевая" форма, что и у остальных
    инпутов виджета, но без иконки слева, поэтому паддинг симметричный */
@@ -257,14 +477,17 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 .qb-status.is-ok { color: var(--ink-soft); }
 
 .catalog-section { padding: 18px 0 56px; }
+/* каталог теперь — ровно 2 карточки-ярлыка (Steam / Stars), поэтому сетка
+   не резиновая на много колонок, а фиксированная в 2 колонки с разумным
+   максимумом ширины — карточки не расползаются на весь десктоп */
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 11px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 560px;
+  margin: 0 auto;
 }
-@media (min-width: 480px) { .catalog-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } }
-@media (min-width: 680px) { .catalog-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; } }
-@media (min-width: 980px) { .catalog-grid { grid-template-columns: repeat(4, 1fr); gap: 18px; } }
+@media (min-width: 480px) { .catalog-grid { gap: 16px; max-width: 620px; } }
 
 .card {
   border-radius: var(--radius-lg);
@@ -274,8 +497,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
   display: flex; flex-direction: column;
   overflow: hidden;
   animation: riseIn 0.4s var(--ease) both;
-  /* skips layout/paint work for cards scrolled off-screen — matters most
-     on weak phones once the catalog grows past a screenful of items */
+  cursor: pointer; /* карточка целиком — ярлык к виджету быстрой покупки */
   content-visibility: auto;
   contain-intrinsic-size: 0 230px;
 }
@@ -283,6 +505,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 .card:hover .icon-plate { transform: scale(1.06); }
 .card:active { transform: translateY(-1px) scale(0.99); }
 .icon-plate { transition: transform 0.18s var(--ease); }
+.btn-buy { pointer-events: none; } /* клик обрабатывает вся карточка, как у qb-suggest-card */
 
 /* visual banner — this is where variety lives, not in the card's shape */
 .card-visual {
@@ -324,11 +547,13 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 }
 .card-accent { height: 3px; }
 
-.cat-topup { --c1: #3d4cd6; --c2: #7b5cf0; background: linear-gradient(150deg, var(--c1) 0%, var(--c2) 100%); }
-.cat-stars { --c1: #f0a23d; --c2: #ef6a4c; background: linear-gradient(150deg, var(--c1) 0%, var(--c2) 100%); }
-.card-accent.cat-topup, .card-accent.cat-stars { background: none; }
-.card-accent.cat-topup { background: linear-gradient(90deg, #3d4cd6, #7b5cf0); }
-.card-accent.cat-stars { background: linear-gradient(90deg, #f0a23d, #ef6a4c); }
+.cat-topup         { --c1: #3d4cd6; --c2: #7b5cf0; background: linear-gradient(150deg, var(--c1) 0%, var(--c2) 100%); }
+.cat-telegram       { --c1: #2f6fd6; --c2: #3d4cd6; background: linear-gradient(150deg, var(--c1) 0%, var(--c2) 100%); }
+.cat-subs           { --c1: #17a673; --c2: #1fcf8f; background: linear-gradient(150deg, var(--c1) 0%, var(--c2) 100%); }
+.card-accent.cat-topup, .card-accent.cat-telegram, .card-accent.cat-subs { background: none; }
+.card-accent.cat-topup        { background: linear-gradient(90deg, #3d4cd6, #7b5cf0); }
+.card-accent.cat-telegram     { background: linear-gradient(90deg, #2f6fd6, #3d4cd6); }
+.card-accent.cat-subs         { background: linear-gradient(90deg, #17a673, #1fcf8f); }
 
 .card-info { padding: 10px 10px 11px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
 .card-eyebrow { display: none; }
@@ -353,7 +578,6 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 }
 .btn-buy:hover { transform: translateY(-1px); background: var(--accent-deep); }
 .btn-buy:active { transform: scale(0.96); }
-.btn-buy.is-disabled { background: var(--surface-alt); color: var(--muted); cursor: default; pointer-events: none; }
 
 .top-tag {
   flex: 0 0 auto;
@@ -374,70 +598,125 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
   display: flex; flex-direction: column; gap: 7px;
   padding: 11px 10px; border-radius: var(--radius-md);
   background: var(--surface); border: 1px solid var(--line);
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease), transform 0.15s var(--ease), background 0.18s var(--ease);
+}
+.trust-item:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.trust-item:active { transform: scale(0.97); }
+/* clicked preference — a colored ring + soft glow around just that card,
+   fed by whichever accent the item itself carries via --trust-c */
+.trust-item.is-active {
+  border-color: var(--trust-c, var(--accent));
+  background: color-mix(in srgb, var(--trust-c, var(--accent)) 7%, var(--surface));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--trust-c, var(--accent)) 22%, transparent),
+    0 10px 22px -10px color-mix(in srgb, var(--trust-c, var(--accent)) 55%, transparent);
+  transform: translateY(-1px);
+}
+.trust-item.is-active .ic {
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--trust-c, var(--accent)) 75%, transparent);
 }
 .trust-item .ic {
   width: 26px; height: 26px; border-radius: 8px;
   background: linear-gradient(140deg, var(--accent) 0%, var(--accent-deep) 100%);
   display: flex; align-items: center; justify-content: center; color: #fff;
   box-shadow: 0 4px 10px -5px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: box-shadow 0.18s var(--ease);
 }
 .trust-item .ic svg { width: 14px; height: 14px; }
 .trust-item b { font-size: 0.75rem; font-weight: 700; color: var(--ink); line-height: 1.2; }
 .trust-item span { font-size: 0.63rem; color: var(--muted); line-height: 1.35; }
 @media (max-width: 360px) { .trust-item span { display: none; } }
 
-/* ---------- Footer ---------- */
-.catalog-footer { border-top: 1px solid var(--line); padding: 26px 0 26px; margin-top: 12px; }
+/* ---------- Footer — one slim row, no big cards/descriptions ---------- */
+.catalog-footer { border-top: 1px solid var(--line); padding: 14px 0; margin-top: 12px; }
 
-.footer-nav {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  padding-bottom: 20px; margin-bottom: 18px; border-bottom: 1px solid var(--line);
+.footer-links {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; flex-wrap: wrap;
 }
-.footer-nav a, .footer-nav button {
-  font-size: 0.8rem; font-weight: 600; color: var(--ink-soft);
-  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
-  text-decoration: none; transition: color 0.15s var(--ease);
+.footer-link {
+  display: inline-flex !important; align-items: center; gap: 6px;
+  padding: 6px 11px !important; border-radius: var(--radius-pill);
+  background: var(--surface); border: 1px solid var(--line) !important;
+  font-size: 0.74rem; font-weight: 600; color: var(--ink-soft);
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease), color 0.15s var(--ease);
+  cursor: pointer; font-family: inherit; text-decoration: none; white-space: nowrap;
 }
-.footer-nav a:hover, .footer-nav button:hover { color: var(--accent); }
-.footer-sep { color: var(--muted); font-size: 0.7rem; }
+.footer-link svg { width: 13px; height: 13px; flex-shrink: 0; }
+.footer-link:hover {
+  border-color: var(--accent) !important; background: var(--accent-tint); color: var(--accent);
+}
 
-.footer-bottom {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+.footer-bottom-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);
 }
-.footer-copy { font-size: 0.68rem; color: var(--muted); }
-@media (max-width: 480px) {
-  .footer-bottom { justify-content: center; text-align: center; }
-}
+.footer-copy { font-size: 0.68rem; color: var(--muted); white-space: nowrap; }
+
 .to-top {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line);
+  width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line);
   color: var(--ink-soft); transition: all 0.15s var(--ease); flex-shrink: 0;
 }
 .to-top:hover { color: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
-.to-top svg { width: 14px; height: 14px; }
+.to-top svg { width: 13px; height: 13px; }
+
+/* ---------- «Вернуться в бота» — всплывает после клика на карточку,
+   ведущую на оплату через Digiseller. Мы не можем
+   заставить их страницу оплаты редиректнуть обратно в бота — это
+   настройка на стороне продавца/площадки — поэтому даём свой способ
+   вернуться, не завязанный на чужой сервер ---------- */
+.return-toast {
+  position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 40;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px; border-radius: var(--radius-lg);
+  background: var(--surface); border: 1px solid var(--line-strong);
+  box-shadow: 0 12px 30px -10px rgba(0,0,0,0.45);
+  max-width: 440px; margin: 0 auto;
+  transform: translateY(140%); opacity: 0;
+  transition: transform 0.28s var(--ease), opacity 0.28s var(--ease);
+  pointer-events: none;
+}
+.return-toast.is-visible { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.return-toast-text { flex: 1 1 200px; font-size: 0.76rem; color: var(--ink-soft); line-height: 1.4; }
+.return-toast-btn {
+  flex: 0 0 auto; padding: 8px 14px; border-radius: var(--radius-pill);
+  background: var(--accent); color: #fff; font-weight: 700; font-size: 0.78rem;
+  text-decoration: none; white-space: nowrap;
+  transition: background 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.return-toast-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
+.return-toast-close {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 1rem; line-height: 1;
+}
+.return-toast-close:hover { color: var(--ink); }
 
 /* ---------- Legal docs: rendered in-page as an overlay, not separate
    files — same palette, same theme toggle, no extra page load ---------- */
 .legal-overlay {
   position: fixed; inset: 0; z-index: 50;
   background: rgba(4, 5, 14, 0.6);
+  backdrop-filter: blur(0px);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 40px 16px;
   opacity: 0; visibility: hidden; pointer-events: none;
-  transition: opacity 0.2s var(--ease);
+  transition: opacity 0.25s var(--ease), backdrop-filter 0.25s var(--ease);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
-.legal-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; }
+.legal-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; backdrop-filter: blur(3px); }
 .legal-modal {
-  position: relative;
   width: 100%; max-width: 680px;
   background: var(--surface); border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg); box-shadow: var(--shadow);
   overflow: hidden;
-  transform: translateY(10px); transition: transform 0.2s var(--ease);
+  opacity: 0; transform: translateY(14px) scale(0.97);
+  transition: transform 0.3s var(--ease), opacity 0.25s var(--ease);
 }
-.legal-overlay.is-open .legal-modal { transform: translateY(0); }
+.legal-overlay.is-open .legal-modal { opacity: 1; transform: translateY(0) scale(1); }
 .legal-modal-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 14px 16px 14px 18px; border-bottom: 1px solid var(--line);
@@ -456,11 +735,28 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 }
 .legal-close svg { width: 15px; height: 15px; }
 .legal-close:hover { background: var(--surface-alt); color: var(--ink); }
-.legal-modal-body {
-  padding: 20px 22px 30px; max-height: 72vh; overflow-y: auto;
-  scrollbar-width: none; -ms-overflow-style: none;
+
+/* tab strip inside the modal — switches which of the four documents is
+   shown without closing/reopening the overlay */
+.legal-tabs {
+  display: flex; gap: 20px; padding: 0 22px; overflow-x: auto;
+  border-bottom: 1px solid var(--line); position: sticky; top: 57px; background: var(--surface); z-index: 2;
+  scrollbar-width: none;
 }
-.legal-modal-body::-webkit-scrollbar { display: none; }
+.legal-tabs::-webkit-scrollbar { display: none; }
+.legal-tab {
+  position: relative; flex-shrink: 0;
+  padding: 12px 1px 11px; font-size: 0.79rem; font-weight: 600; color: var(--muted);
+  white-space: nowrap; transition: color 0.15s var(--ease);
+}
+.legal-tab:hover { color: var(--ink-soft); }
+.legal-tab.is-active { color: var(--ink); }
+.legal-tab.is-active::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--coral));
+}
+.legal-modal-body { padding: 20px 22px 30px; max-height: 66vh; overflow-y: auto; }
+.legal-doc { animation: riseIn 0.25s var(--ease) both; }
 .legal-doc h1 { font-size: 1.28rem; margin: 0 0 6px; }
 .legal-doc .meta { font-size: 0.76rem; color: var(--muted); margin-bottom: 6px; }
 .legal-doc .notice {
@@ -480,53 +776,95 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 .legal-doc .req p { margin: 4px 0; }
 .legal-doc .req b { color: var(--ink); }
 .legal-doc .doc-link { color: var(--accent); font-weight: 600; cursor: pointer; background: none; border: none; padding: 0; font: inherit; text-decoration: underline; }
-
-/* ---- список документов внутри кнопки «Политики» ---- */
-.legal-hub-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
-.legal-hub-item {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-  padding: 13px 14px; text-align: left;
-  background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-md);
-  cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
-}
-.legal-hub-item:hover { border-color: var(--line-strong); transform: translateX(2px); }
-.legal-hub-icon {
-  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px;
-  background: var(--surface); border: 1px solid var(--line-strong);
-  display: flex; align-items: center; justify-content: center; color: var(--accent);
-}
-.legal-hub-icon svg { width: 16px; height: 16px; }
-.legal-hub-text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.legal-hub-text b { font-size: 0.87rem; color: var(--ink); font-weight: 700; }
-.legal-hub-text small { font-size: 0.76rem; color: var(--muted); line-height: 1.4; }
-.legal-hub-arrow { flex: 0 0 auto; width: 16px; height: 16px; color: var(--muted); }
-.legal-hub-arrow svg { width: 100%; height: 100%; }
-
-/* ---- кнопка возврата к списку документов ---- */
-.legal-back {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-bottom: 16px; padding: 0; border: none; background: none;
-  color: var(--muted); font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer;
-  transition: color 0.15s var(--ease);
-}
-.legal-back:hover { color: var(--accent); }
-.legal-back svg { width: 13px; height: 13px; }
 @media (max-width: 480px) {
-  .legal-overlay { padding: 0; align-items: stretch; overflow: hidden; }
-  .legal-modal {
-    max-width: none; border: none; border-radius: 0;
-    height: 100vh; height: 100dvh;
-    display: flex; flex-direction: column;
-  }
-  .legal-modal-head { flex: 0 0 auto; }
-  .legal-modal-body {
-    flex: 1 1 auto; max-height: none;
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-  }
+  .legal-overlay { padding: 0; align-items: stretch; }
+  .legal-modal { max-width: none; min-height: 100%; border-radius: 0; border: none; }
+  .legal-modal-body { max-height: none; }
+}
+
+/* ---------- Карточка товара — открывается вместо прямого
+   перехода. Пытаемся вживую отрисовать официальный виджет Digiseller
+   (их скрипт сам подставит картинку/цену/кнопку «Купить»), а под ним
+   всегда держим свою кнопку-страховку на прямую ссылку оплаты — на
+   случай, если виджет не успел/не смог отрисоваться. ---------- */
+.pm-overlay {
+  position: fixed; inset: 0; z-index: 55;
+  background: rgba(4, 5, 14, 0.6);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.25s var(--ease);
+}
+.pm-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; backdrop-filter: blur(3px); }
+.pm-modal {
+  width: 100%; max-width: 420px;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: 20px 20px 0 0; box-shadow: var(--shadow);
+  padding: 18px 18px 22px;
+  opacity: 0; transform: translateY(24px);
+  transition: transform 0.3s var(--ease), opacity 0.25s var(--ease);
+  max-height: 88vh; overflow-y: auto;
+}
+.pm-overlay.is-open .pm-modal { opacity: 1; transform: translateY(0); }
+@media (min-width: 560px) {
+  .pm-overlay { align-items: center; padding: 20px; }
+  .pm-modal { border-radius: var(--radius-lg); transform: translateY(14px) scale(0.97); }
+}
+.pm-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.pm-ic {
+  width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(140deg, var(--accent) 0%, var(--accent-deep) 100%);
+}
+.pm-ic svg { width: 20px; height: 20px; }
+.pm-head-text { flex: 1; min-width: 0; }
+.pm-title { font-size: 1rem; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.pm-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.pm-close {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; color: var(--muted);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.pm-close svg { width: 15px; height: 15px; }
+.pm-close:hover { background: var(--surface-alt); color: var(--ink); }
+
+.pm-widget-wrap {
+  border-radius: 14px; background: #f4f5f9; padding: 12px;
+  min-height: 64px; display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.pm-widget-wrap .digiseller-buy-standalone { width: 100%; }
+.pm-widget-loading {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.76rem; color: #6b6f80;
+}
+.pm-widget-loading .pm-spin {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid rgba(60,64,90,0.25); border-top-color: #3d4cd6;
+  animation: qbSpin 0.7s linear infinite;
+}
+.pm-fallback {
+  margin-top: 12px; display: flex; align-items: center; justify-content: center;
+  gap: 6px; font-size: 0.78rem; color: var(--accent); font-weight: 600;
+  text-decoration: none;
+}
+.pm-fallback svg { width: 13px; height: 13px; }
+.pm-fallback:hover { text-decoration: underline; }
+.pm-note {
+  margin-top: 12px; font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.5;
 }
 </style>
 </head>
 <body>
+
+<!-- shared gradient def — referenced by every brand mark instead of each
+     one carrying its own <defs>, so the logo motif only ships once -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+        <linearGradient id="dkg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#aab0ff"/><stop offset="55%" stop-color="#6c78ff"/><stop offset="100%" stop-color="#ff8a68"/>
+        </linearGradient>
+    </defs>
+</svg>
 
 <header class="catalog-header">
     <div class="hero-clip">
@@ -534,31 +872,36 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
             <div class="top-row">
                 <div class="brand-row">
                     <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px">
-                        <defs><linearGradient id="dkgHeader" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#aab0ff"/><stop offset="55%" stop-color="#6c78ff"/><stop offset="100%" stop-color="#ff8a68"/></linearGradient></defs>
-                        <circle cx="8" cy="8" r="4" stroke="url(#dkgHeader)"/><path d="M11 11l9 9M17 15l2.5 2.5M14 12l2.5 2.5" stroke="url(#dkgHeader)"/>
+                        <circle cx="8" cy="8" r="4" stroke="url(#dkg)"/><path d="M11 11l9 9M17 15l2.5 2.5M14 12l2.5 2.5" stroke="url(#dkg)"/>
                     </svg></span>
                     <span class="brand-name">Duskey</span>
                 </div>
-                <button type="button" class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
-                    <span class="knob" id="themeKnob">
-                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.5 5.5 0 0 1-7.54-7.54A9.1 9.1 0 0 0 12 3z"/></svg>
-                    </span>
-                </button>
+                <div class="top-actions">
+                    <a class="tg-pill" href="https://t.me/Duskey_Shop" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 240 240" fill="currentColor" stroke="none"><path d="M120 0a120 120 0 1 0 0 240 120 120 0 0 0 0-240zm55.6 81.7-18.7 88.2c-1.4 6.3-5.1 7.9-10.3 4.9l-28.5-21-13.7 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2l-65.1 41-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9l109.8-42.3c5.1-1.9 9.6 1.2 7.9 8.7z"/></svg>
+                        <span class="tg-pill-label">Канал в Telegram</span>
+                    </a>
+                    <button type="button" class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
+                        <span class="knob" id="themeKnob">
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.5 5.5 0 0 1-7.54-7.54A9.1 9.1 0 0 0 12 3z"/></svg>
+                        </span>
+                    </button>
+                </div>
             </div>
             <h1>Магазин цифровых товаров</h1>
             <p class="sub">Игры, подписки и пополнения — быстро, без лишних шагов.</p>
-            <div class="trust-row">
-                <div class="trust-item">
+            <div class="trust-row" id="trustRow">
+                <div class="trust-item" tabindex="0" role="button" aria-pressed="false" style="--trust-c: #ff8a68;">
                     <span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></span>
                     <b>Быстро</b>
                     <span>Доставка за 1–5 минут</span>
                 </div>
-                <div class="trust-item">
+                <div class="trust-item" tabindex="0" role="button" aria-pressed="false" style="--trust-c: #4fd18b;">
                     <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7.5" r="1.5"/><circle cx="16.5" cy="16.5" r="1.5"/><path d="M17 7L7 17"/></svg></span>
                     <b>Выгодно</b>
                     <span>Цены без переплат</span>
                 </div>
-                <div class="trust-item">
+                <div class="trust-item" tabindex="0" role="button" aria-pressed="false" style="--trust-c: #6c78ff;">
                     <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
                     <b>Безопасно</b>
                     <span>Проверенные продавцы</span>
@@ -604,19 +947,71 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
                 <h2 class="section-title" id="catalogTitle">Все товары</h2>
             </div>
         </div>
+    </div>
+    <!-- search + filters live right next to what they act on, not up in the
+         hero — and stay reachable (sticky) while scrolling the grid below -->
+    <div class="catalog-toolbar">
+        <div class="container">
+            <div class="search-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input type="text" class="search-input" id="searchInput" placeholder="Найти — например, Steam или Stars">
+                <span class="search-kbd" id="searchKbd">/</span>
+                <button type="button" class="search-clear" id="searchClear" aria-label="Очистить поиск">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div class="filter-scroll">
+                <div class="filter-row" id="filterRow"></div>
+                <div class="filter-swipe-hint" id="filterSwipeHint">
+                    <button type="button" class="badge" id="filterSwipeBtn" aria-label="Есть ещё фильтры — подсказка">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                    </button>
+                    <div class="filter-swipe-pop" id="filterSwipePop" role="tooltip">
+                        <p>Справа есть ещё фильтры — свайпните ряд</p>
+                        <button type="button" id="filterSwipePopClose">Понятно</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="qb-suggest" id="qbSuggest" hidden></div>
         <div class="catalog-grid" id="catalogGrid"></div>
     </div>
 </section>
 
+<!-- всплывает после перехода на оплату через Digiseller —
+     см. openExternalPurchase() в скрипте ниже -->
+<div class="return-toast" id="returnToast" role="status" aria-live="polite">
+    <span class="return-toast-text">Оплата открылась в новом окне. После оплаты (или если передумали) можно вернуться сюда же.</span>
+    <a class="return-toast-btn" id="returnToastBtn" href="#" target="_blank" rel="noopener">Вернуться в бота</a>
+    <button type="button" class="return-toast-close" id="returnToastClose" aria-label="Закрыть">×</button>
+</div>
+
+<!-- карточка товара с внешней площадки: пытаемся отрисовать живой
+     виджет Digiseller, содержимое собирает openProductModal() -->
+<div class="pm-overlay" id="pmOverlay">
+    <div class="pm-modal" id="pmModal"></div>
+</div>
+
 <footer class="catalog-footer">
     <div class="container">
-        <nav class="footer-nav">
-            <button type="button" data-doc="hub">Политики</button>
-            <span class="footer-sep">·</span>
-            <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">Написать в поддержку</a>
-        </nav>
-        <div class="footer-bottom">
-            <p class="footer-copy">© 2026 Duskey. Все цены указаны в рублях РФ.</p>
+        <div class="footer-links">
+            <button type="button" class="footer-link" id="policiesBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h9a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1H8"/><path d="M8 4a2 2 0 0 0-2 2v14l3-2 3 2 3-2 2 1.3V6a2 2 0 0 0-2-2"/></svg>
+                <span>Документы</span>
+            </button>
+            <a class="footer-link" href="https://t.me/Duskey_Support" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>Поддержка</span>
+            </a>
+            <a class="footer-link" href="https://t.me/Duskey_Shop" target="_blank" rel="noopener">
+                <svg viewBox="0 0 240 240" fill="currentColor" stroke="none"><path d="M120 0a120 120 0 1 0 0 240 120 120 0 0 0 0-240zm55.6 81.7-18.7 88.2c-1.4 6.3-5.1 7.9-10.3 4.9l-28.5-21-13.7 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2l-65.1 41-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9l109.8-42.3c5.1-1.9 9.6 1.2 7.9 8.7z"/></svg>
+                <span>Сообщество</span>
+            </a>
+        </div>
+        <div class="footer-bottom-row">
+            <p class="footer-copy">© 2026 Duskey</p>
             <button type="button" class="to-top" id="toTopBtn" aria-label="Наверх"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></button>
         </div>
     </div>
@@ -626,77 +1021,65 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
     <div class="legal-modal">
         <div class="legal-modal-head">
             <span class="brand-mini"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px">
-                <defs><linearGradient id="dkgModal" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#aab0ff"/><stop offset="55%" stop-color="#6c78ff"/><stop offset="100%" stop-color="#ff8a68"/></linearGradient></defs>
-                <circle cx="8" cy="8" r="4" stroke="url(#dkgModal)"/><path d="M11 11l9 9M17 15l2.5 2.5M14 12l2.5 2.5" stroke="url(#dkgModal)"/>
-            </svg></span>Duskey</span>
+                <circle cx="8" cy="8" r="4" stroke="url(#dkg)"/><path d="M11 11l9 9M17 15l2.5 2.5M14 12l2.5 2.5" stroke="url(#dkg)"/>
+            </svg></span>Политики</span>
             <button type="button" class="legal-close" id="legalClose" aria-label="Закрыть">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
+        </div>
+        <div class="legal-tabs" id="legalTabs">
+            <button type="button" class="legal-tab" data-doc="offer">Оферта</button>
+            <button type="button" class="legal-tab" data-doc="privacy">Конфиденциальность</button>
+            <button type="button" class="legal-tab" data-doc="terms">Соглашение</button>
+            <button type="button" class="legal-tab" data-doc="refund">Возврат и обмен</button>
         </div>
         <div class="legal-modal-body" id="legalBody"></div>
     </div>
 </div>
 
-<template id="tpl-hub">
-<div class="legal-doc legal-hub">
-    <h1>Политики</h1>
-    <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice">Коротко: оплату принимает сам Duskey, а фактическое исполнение — зачисление Steam, а в будущем звёзд Telegram — берут на себя сторонние сервисы <b>Antilopay</b> и <b>Fragment</b>. Подробности — в документах ниже.</div>
-    <div class="legal-hub-grid">
-        <button type="button" class="legal-hub-item" data-doc="offer">
-            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
-            <span class="legal-hub-text"><b>Условия использования сайта</b><small>Публичная оферта: как оформляется и оплачивается пополнение</small></span>
-            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
-        </button>
-        <button type="button" class="legal-hub-item" data-doc="privacy">
-            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/></svg></span>
-            <span class="legal-hub-text"><b>Политика конфиденциальности</b><small>Какие данные собираются и кому передаются при оплате</small></span>
-            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
-        </button>
-        <button type="button" class="legal-hub-item" data-doc="terms">
-            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
-            <span class="legal-hub-text"><b>Пользовательское соглашение</b><small>Общие правила пользования Сайтом</small></span>
-            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
-        </button>
-        <button type="button" class="legal-hub-item" data-doc="refund">
-            <span class="legal-hub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></span>
-            <span class="legal-hub-text"><b>Возврат и обмен</b><small>Когда положен возврат средств и как его оформить</small></span>
-            <span class="legal-hub-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
-        </button>
-    </div>
-</div>
-</template>
-
 <template id="tpl-offer">
 <div class="legal-doc">
     <h1>Публичная оферта</h1>
-    <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice">Duskey продаёт напрямую, без сторонних маркетплейсов: пополнение Steam, а в будущем — звёзды Telegram. Раздел «Звёзды Telegram» пока отмечен как «скоро» — оферта начнёт действовать на него с момента запуска продаж.</div>
+    <p class="meta">Редакция от 28 августа 2026 г.</p>
+    <div class="notice"><b>Продавец всех товаров Сайта — Владелец Сайта</b> (реквизиты — п. 7), независимо от того, что именно вы покупаете: пополнение Steam, Telegram Premium/Stars, подписки (Spotify, Claude AI, ChatGPT) или Robux. Оплата по всем позициям принимается через сторонний платёжный сервис <b>Digiseller</b> (он же Plati.Market) — это защищённая страница оплаты и доставки цифрового товара, а не отдельный продавец.</div>
 
     <h2>1. Термины</h2>
-    <p><b>Сайт</b> — Duskey и связанный с ним сервер. <b>Владелец Сайта</b> — лицо, администрирующее Сайт и оказывающее описанные ниже услуги; контакты — п. 6. <b>Пользователь</b> — любое лицо, использующее Сайт. <b>Модуль пополнения Steam</b> — раздел Сайта, где Владелец Сайта принимает оплату через платёжного провайдера Antilopay и инициирует зачисление средств на указанный Steam-аккаунт. <b>Модуль звёзд Telegram</b> — раздел Сайта, где в будущем будет продаваться пополнение звёзд Telegram через сервис Fragment; на дату этой редакции недоступен для покупки.</p>
-    <p>Начиная использовать Сайт, Пользователь подтверждает, что ознакомился с условиями настоящей оферты и принимает их в полном объёме. Нажатие кнопки «Купить» и переход к оплате в любом из модулей Сайта означает акцепт настоящей оферты и заключение договора возмездного оказания услуг между Пользователем и Владельцем Сайта.</p>
+    <p><b>Сайт</b> — Duskey и связанный с ним сервер. <b>Владелец Сайта</b> — лицо, указанное в реквизитах (п. 7), продавец всех товаров и услуг Сайта. <b>Пользователь</b> — любое лицо, использующее Сайт. <b>Каталог</b> — витрина товаров Сайта. <b>Digiseller</b> — сторонний платёжный и фискальный оператор (аналог эквайринга), через страницу которого Пользователь оплачивает заказ и получает цифровой товар; Digiseller обрабатывает платёж и техническую доставку по поручению Владельца Сайта и не является самостоятельным продавцом товаров, представленных в каталоге.</p>
+    <p>Начиная использовать Сайт, Пользователь подтверждает, что ознакомился с условиями настоящей оферты и принимает их в полном объёме. Нажатие кнопки «Купить» и переход к оплате означает акцепт настоящей оферты и заключение договора купли-продажи/возмездного оказания услуг между Пользователем и Владельцем Сайта.</p>
 
-    <h2>2. Пополнение Steam: предмет и продавец услуги</h2>
-    <p>Владелец Сайта оказывает Пользователю возмездную услугу: приём оплаты и инициирование зачисления указанной суммы на баланс указанного Steam-аккаунта. Оплата принимается через платёжного провайдера <b>Antilopay</b> напрямую на Сайте; фактическое зачисление средств на баланс Steam выполняет Antilopay как оператор соответствующего сервиса пополнения.</p>
+    <h2>2. Предмет оферты</h2>
+    <p>Владелец Сайта продаёт цифровые товары и услуги, перечисленные в каталоге (пополнение баланса Steam, Telegram Premium, Telegram Stars, подписки Spotify/Claude AI/ChatGPT, Robux и другие позиции по мере добавления). Ассортимент и цены на Сайте указаны справочно и могут уточняться на странице оплаты.</p>
 
-    <h2>3. Пополнение Steam: порядок оформления и оплаты</h2>
+    <h2>3. Порядок оформления и оплаты</h2>
     <ol>
-        <li>Пользователь указывает логин Steam-аккаунта, сумму пополнения и email для чека и связи.</li>
-        <li>Сайт проверяет возможность пополнения указанного аккаунта и создаёт платёж через Antilopay; Пользователь переходит на страницу оплаты Antilopay и завершает оплату выбранным способом.</li>
-        <li>Договор считается исполненным Владельцем Сайта с момента подтверждения зачисления средств на указанный Steam-аккаунт (Callback-уведомление от Antilopay или подтверждение статуса «SUCCESS» при проверке заказа).</li>
-        <li>Ответственность за правильность указанного логина Steam несёт Пользователь — Сайт не может отменить или перенаправить уже исполненное зачисление на другой аккаунт.</li>
+        <li>Пользователь выбирает товар на Сайте и нажимает «Купить» — открывается карточка товара с переходом к оплате.</li>
+        <li>Оплата принимается на защищённой странице Digiseller: Пользователь указывает необходимые для доставки товара данные (например, логин Steam или username Telegram) и оплачивает заказ выбранным способом.</li>
+        <li>Договор считается заключённым и исполненным Владельцем Сайта с момента поступления оплаты и подтверждения доставки товара со стороны Digiseller.</li>
+        <li>Ответственность за правильность указанных при оплате данных (логин, username и т.п.) несёт Пользователь — ошибочно указанные данные могут сделать доставку товара невозможной или необратимой.</li>
     </ol>
-    <p>Зачисление на баланс аккаунта обычно происходит от нескольких минут до часа с момента подтверждения оплаты; при задержке свыше суток следует обратиться в поддержку Сайта (п. 6).</p>
 
-    <h2>4. Звёзды Telegram: предмет услуги (раздел временно недоступен)</h2>
-    <p>После запуска Владелец Сайта будет оказывать Пользователю возмездную услугу пополнения звёзд Telegram на указанный аккаунт через сервис <b>Fragment</b>. Условия оплаты, порядок оформления и продавец по этому модулю будут описаны в этом разделе перед запуском продаж; до этого момента кнопка покупки в модуле звёзд неактивна и оплата не принимается.</p>
+    <h2>4. Доставка / исполнение</h2>
+    <p>Выдача цифрового товара и кассового чека происходит на странице Digiseller сразу после подтверждения оплаты, обычно в течение нескольких минут (иногда — до 24 часов для отдельных позиций). Статус заказа и чек доступны в личном кабинете покупателя на digiseller.market/plati.market. При задержке свыше суток следует обратиться в поддержку Сайта (п. 9).</p>
 
     <h2>5. Ответственность</h2>
-    <p>Сайт предоставляется «как есть». Владелец Сайта отвечает за исполнение оказываемых им услуг (приём оплаты, инициирование зачисления) в пределах, установленных применимым законодательством о защите прав потребителей, но не отвечает за действия и работоспособность сервисов Steam/Valve, Telegram/Fragment и платёжных провайдеров как таковых.</p>
+    <p>Сайт предоставляется «как есть». Владелец Сайта отвечает за исполнение заказа (продажу товара, приём оплаты через Digiseller) в пределах, установленных применимым законодательством о защите прав потребителей, но не отвечает за технические сбои на стороне Digiseller как платёжного оператора, а также за работоспособность сервисов конечных площадок (Steam/Valve, Telegram, Spotify, Roblox и т.п.), на которые зачисляется приобретённый товар.</p>
 
-    <h2>6. Возврат, изменение условий и контакты</h2>
-    <p>Правила возврата подробно описаны в отдельном документе «<button type="button" class="doc-link" data-doc="refund">Возврат и обмен</button>». Владелец Сайта вправе изменять настоящую оферту в любое время без отдельного уведомления — актуальная редакция всегда доступна на этой странице; для уже оплаченных заказов применяется редакция, действовавшая на момент оплаты.</p>
+    <h2>6. Возврат и обмен</h2>
+    <p>Правила возврата подробно описаны в отдельном документе «<button type="button" class="doc-link" data-doc="refund">Возврат и обмен</button>».</p>
+
+    <h2>7. Реквизиты продавца</h2>
+    <div class="req">
+        <p><b>⚠️ Заполнить перед публикацией сайта.</b> Ниже должны быть реальные данные лица, зарегистрированного в Digiseller как продавец, — именно оно продаёт товары Сайта.</p>
+        <p><b>Наименование:</b> [ИП/Самозанятый/ООО — укажите полное наименование]</p>
+        <p><b>ИНН:</b> [укажите] &nbsp; <b>ОГРН/ОГРНИП:</b> [укажите, если применимо]</p>
+        <p><b>Юридический/фактический адрес:</b> [укажите]</p>
+        <p><b>Контакт для претензий:</b> [email или телефон]</p>
+    </div>
+
+    <h2>8. Изменение условий</h2>
+    <p>Владелец Сайта вправе изменять настоящую оферту в любое время без отдельного уведомления. Актуальная редакция всегда доступна на этой странице; продолжение использования Сайта означает согласие с изменениями. Для уже оплаченных заказов применяется редакция оферты, действовавшая на момент оплаты.</p>
+
+    <h2>9. Контакты</h2>
     <div class="req">
         <p><b>Поддержка Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
     </div>
@@ -706,48 +1089,51 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 <template id="tpl-privacy">
 <div class="legal-doc">
     <h1>Политика конфиденциальности</h1>
-    <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice">Duskey всё обрабатывает сам — без передачи данных на сторонние маркетплейсы. При обычном просмотре собираются только технические данные (п. 2); при оформлении пополнения Steam — дополнительно логин, email и IP-адрес (п. 3). Раздел «Звёзды Telegram» пока недоступен для покупки — сбор данных по нему начнётся только после запуска (п. 4).</div>
+    <p class="meta">Редакция от 28 августа 2026 г.</p>
+    <div class="notice">Сайт сам почти не собирает персональных данных: при оформлении заказа Пользователь вводит логин/username, email и данные оплаты напрямую на защищённой странице Digiseller, а не на Сайте — см. п. 2.</div>
 
     <h2>1. Общие положения</h2>
-    <p>Настоящая Политика (далее — «Политика») определяет порядок обработки персональных данных Пользователей на сайте Duskey (далее — «Сайт») в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных». Оператором персональных данных, обрабатываемых Сайтом (п. 2–4), является Владелец Сайта — контакты для обращений см. в п. 9.</p>
 
-    <h2>2. Данные при обычном просмотре Сайта</h2>
+    <p>Настоящая Политика (далее — «Политика») определяет порядок обработки персональных данных Пользователей на сайте Duskey (далее — «Сайт») в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных». Оператором персональных данных, обрабатываемых Сайтом самостоятельно (п. 2–3), является Владелец Сайта — реквизиты см. в п. 9.</p>
+
+    <h2>2. Данные при обычном просмотре</h2>
     <table>
         <tr><th>Данные</th><th>Цель обработки</th><th>Основание</th></tr>
         <tr><td>IP-адрес, данные браузера и устройства, cookies</td><td>Работа Сайта, аналитика посещаемости</td><td>Законный интерес Сайта (ст. 6 152-ФЗ)</td></tr>
         <tr><td>Выбранная тема оформления (тёмная/светлая)</td><td>Сохранение пользовательской настройки интерфейса</td><td>Законный интерес Сайта</td></tr>
+        <tr><td>Поисковые запросы внутри каталога</td><td>Отображение релевантных товаров в текущей сессии</td><td>Законный интерес Сайта</td></tr>
     </table>
-    <p>При обычном просмотре страниц Сайт не запрашивает логины и ID в Steam, Telegram и аналогичных сервисах, не собирает email и номер телефона и не имеет доступа к данным банковских карт. Эти данные Пользователь указывает только при оформлении конкретной покупки — см. п. 3–4.</p>
+    <p>При обычном просмотре Сайт не запрашивает логины и ID в Steam, Telegram и аналогичных сервисах, не собирает email и номер телефона и не имеет доступа к данным банковских карт. Всё это Пользователь указывает напрямую на защищённой странице оплаты Digiseller при оформлении заказа — см. п. 3.</p>
 
-    <h2>3. Данные при оформлении пополнения Steam</h2>
+    <h2>3. Данные при оформлении заказа</h2>
     <table>
         <tr><th>Данные</th><th>Цель обработки</th><th>Основание</th></tr>
-        <tr><td>Логин Steam-аккаунта</td><td>Идентификация аккаунта для зачисления средств</td><td>Исполнение договора (акцепт оферты)</td></tr>
+        <tr><td>Логин Steam / username Telegram / данные для аналогичных сервисов</td><td>Идентификация получателя для доставки цифрового товара</td><td>Исполнение договора (акцепт оферты)</td></tr>
         <tr><td>Email</td><td>Отправка чека, связь по статусу заказа</td><td>Исполнение договора</td></tr>
-        <tr><td>IP-адрес, User-Agent</td><td>Передаются платёжному провайдеру в рамках противодействия мошенничеству</td><td>Исполнение договора, законный интерес</td></tr>
-        <tr><td>Сумма и статус платежа, идентификатор заказа</td><td>Учёт заказов, подтверждение статуса при обращениях в поддержку</td><td>Исполнение договора</td></tr>
+        <tr><td>Данные оплаты (номер карты и т.п.)</td><td>Приём платежа</td><td>Исполнение договора — обрабатываются напрямую Digiseller, Сайту не передаются</td></tr>
     </table>
-    <p>Эти данные обрабатывает сам Сайт (сервер Владельца Сайта) и передаёт платёжному провайдеру Antilopay в объёме, необходимом для проведения платежа и зачисления средств. Номер банковской карты и иные платёжные реквизиты Сайт не собирает и не хранит — их обрабатывает непосредственно Antilopay при оплате.</p>
+    <p>Эти данные Пользователь вводит напрямую на странице Digiseller, а не на Сайте, — Сайт их не получает, не хранит и доступа к ним не имеет. Обработка этих данных регулируется собственной политикой конфиденциальности Digiseller.</p>
 
-    <h2>4. Данные при оформлении покупки звёзд Telegram (раздел временно недоступен)</h2>
-    <p>Раздел «Звёзды Telegram» на дату этой редакции — заглушка, кнопка покупки в нём неактивна, оплата не принимается и данные Пользователя по этому разделу не собираются. После запуска продаж через сервис <b>Fragment</b> этот пункт будет обновлён и будет содержать перечень собираемых данных (по аналогии с п. 3) до начала приёма платежей.</p>
+    <h2>4. Передача данных третьим лицам</h2>
+    <p><b>Digiseller (Digiseller/Plati.Market)</b> — платёжный и фискальный оператор, которому Пользователь передаёт данные заказа и оплаты напрямую на своей странице; Сайт выступает лишь витриной и этими данными не располагает.</p>
 
-    <h2>5. Передача данных третьим лицам</h2>
-    <p><b>Antilopay</b> — при оформлении пополнения Steam получает от Сайта данные, перечисленные в п. 3, для проведения платежа; обработка Antilopay регулируется собственной политикой конфиденциальности этого провайдера. Сайт с маркетплейсом GGSel не связан и данные Пользователей на GGSel не передаёт.</p>
+    <h2>5. Сроки хранения</h2>
+    <p>Технические данные (п. 2) хранятся не дольше, чем необходимо для целей их сбора, либо до отзыва согласия Пользователем через cookie-настройки браузера. Сайт не хранит данные заказов (п. 3) — они находятся у Digiseller и доступны Пользователю в личном кабинете на digiseller.market/plati.market.</p>
 
-    <h2>6. Сроки хранения</h2>
-    <p>Технические данные (п. 2) хранятся не дольше, чем необходимо для целей их сбора, либо до отзыва согласия Пользователем через cookie-настройки браузера. Данные о заказах пополнения Steam (п. 3) хранятся в течение срока, необходимого для исполнения договора, разрешения споров и выполнения требований законодательства (включая налоговый и бухгалтерский учёт), но не дольше 3 лет с даты последней операции по заказу, если иной срок не установлен законом.</p>
+    <h2>6. Права Пользователя</h2>
+    <p>В отношении данных, которые собирает сам Сайт (п. 2), Пользователь вправе запросить информацию об их обработке, потребовать их уточнения, блокирования или удаления, а также отозвать согласие на обработку — обратившись по контакту в п. 9. В отношении данных, введённых при оплате на Digiseller, обращаться следует напрямую в поддержку Digiseller.</p>
 
-    <h2>7. Права Пользователя</h2>
-    <p>В отношении данных, которые собирает Сайт (п. 2–3), Пользователь вправе запросить информацию об их обработке, потребовать их уточнения, блокирования или удаления (за вычетом данных, которые Сайт обязан хранить в силу закона — например, для налогового учёта завершённых платежей), а также отозвать согласие на обработку — обратившись по контакту в п. 9. Отзыв согласия до завершения оплаты означает отмену текущего заказа пополнения Steam.</p>
+    <h2>7. Файлы cookie</h2>
+    <p>Сайт использует cookie-файлы для сохранения пользовательских настроек (например, выбранной темы оформления) и для анализа посещаемости. Отключение cookie в настройках браузера может ограничить часть функций Сайта.</p>
 
-    <h2>8. Файлы cookie</h2>
-    <p>Сайт использует cookie-файлы для сохранения пользовательских настроек (например, выбранной темы оформления) и для анализа посещаемости. Отключение cookie в настройках браузера может ограничить часть функций Сайта, но не препятствует оформлению пополнения Steam.</p>
-
-    <h2>9. Изменение политики и контакты</h2>
+    <h2>8. Изменение политики</h2>
     <p>Владелец Сайта вправе вносить изменения в настоящую Политику в любое время без отдельного уведомления. Актуальная редакция всегда доступна на этой странице.</p>
+
+    <h2>9. Оператор персональных данных и контакты</h2>
     <div class="req">
+        <p><b>⚠️ Заполнить перед публикацией сайта</b> — реквизиты того же лица, что указано в оферте (п. 7).</p>
+        <p><b>Наименование:</b> [ИП/Самозанятый/ООО — укажите полное наименование]</p>
+        <p><b>ИНН:</b> [укажите]</p>
         <p><b>По вопросам обработки данных:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
     </div>
 </div>
@@ -757,7 +1143,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 <div class="legal-doc">
     <h1>Пользовательское соглашение</h1>
     <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice"><b>Настоящее Соглашение регулирует пользование Сайтом в целом</b> как прямым продавцом услуг пополнения Steam и (после запуска) звёзд Telegram. Условия конкретных сделок описаны в документе «Публичная оферта».</div>
+    <div class="notice"><b>Настоящее Соглашение регулирует пользование Сайтом в целом.</b> Условия конкретных покупок описаны в документе «Публичная оферта».</div>
 
     <h2>1. Общие положения</h2>
     <p>Настоящее Пользовательское соглашение (далее — «Соглашение») регулирует отношения между администрацией сайта Duskey (далее — «Администрация») и любым лицом, использующим Сайт (далее — «Пользователь»). Начиная использовать Сайт, Пользователь подтверждает согласие с условиями настоящего Соглашения в полном объёме.</p>
@@ -766,22 +1152,22 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
     <ul>
         <li>Пользователь обязуется использовать Сайт только в законных целях и не совершать действий, способных нарушить его нормальную работу или доступность для других пользователей.</li>
         <li>Запрещается использование автоматизированных средств (парсеров, ботов, скриптов массового сбора данных) без предварительного письменного согласия Администрации.</li>
-        <li>Запрещаются попытки получить несанкционированный доступ к разделам Сайта, серверам или сетям, связанным с Сайтом, включая модуль пополнения Steam и его платёжную интеграцию.</li>
-        <li>Запрещено использовать модуль пополнения Steam для оплаты заведомо чужими платёжными средствами без согласия их владельца, а также в целях, нарушающих правила Steam/Valve.</li>
+        <li>Запрещаются попытки получить несанкционированный доступ к разделам Сайта, серверам или сетям, связанным с Сайтом.</li>
+        <li>Запрещено оформлять заказы на Сайте заведомо чужими платёжными средствами без согласия их владельца, а также в целях, нарушающих правила конечных сервисов (Steam/Valve, Telegram и т.п.).</li>
         <li>Запрещено размещать на Сайте (в отзывах, комментариях и иных пользовательских разделах, если они предусмотрены) материалы, нарушающие законодательство или права третьих лиц.</li>
     </ul>
 
     <h2>3. Дееспособность Пользователя</h2>
-    <p>Оплачивая пополнение Steam или (после запуска) звёзд Telegram, Пользователь подтверждает, что обладает необходимой дееспособностью для заключения сделок, либо действует с согласия законного представителя, если это требуется по применимому законодательству.</p>
+    <p>Совершая покупку на Сайте, Пользователь подтверждает, что обладает необходимой дееспособностью для заключения сделок, либо действует с согласия законного представителя, если это требуется по применимому законодательству.</p>
 
     <h2>4. Интеллектуальная собственность</h2>
-    <p>Дизайн, тексты, элементы интерфейса и иные материалы Сайта являются объектами интеллектуальной собственности Администрации либо используются на законных основаниях. Товарные знаки третьих лиц (Steam, Telegram и др.), упоминаемые на Сайте, принадлежат их правообладателям и используются исключительно в информационных целях. Использование материалов Сайта без разрешения Администрации запрещено, кроме случаев, прямо разрешённых законом.</p>
+    <p>Дизайн, тексты, элементы интерфейса и иные материалы Сайта являются объектами интеллектуальной собственности Администрации либо используются на законных основаниях. Товарные знаки третьих лиц (Steam, Telegram, Spotify, Roblox и др.), упоминаемые на Сайте, принадлежат их правообладателям и используются исключительно в информационных целях. Использование материалов Сайта без разрешения Администрации запрещено, кроме случаев, прямо разрешённых законом.</p>
 
     <h2>5. Ограничение ответственности</h2>
-    <p>Сайт предоставляется «как есть» (as is). Администрация не гарантирует бесперебойную и безошибочную работу Сайта, платёжного модуля пополнения Steam или интеграции с Antilopay, и не несёт ответственности за временную недоступность сервиса по техническим или иным причинам. Условия конкретных покупок, оплаты и доставки регулируются отдельным документом — «Публичной офертой».</p>
+    <p>Сайт предоставляется «как есть» (as is). Администрация не гарантирует бесперебойную и безошибочную работу Сайта или платёжного оператора Digiseller и не несёт ответственности за временную недоступность сервиса по техническим или иным причинам. Условия покупки, оплаты и доставки регулируются отдельным документом — «Публичной офертой».</p>
 
-    <h2>6. Интеграции со сторонними сервисами</h2>
-    <p>Сайт использует платёжного провайдера <b>Antilopay</b> для приёма оплаты в модуле пополнения Steam, а после запуска раздела звёзд Telegram будет использовать сервис <b>Fragment</b> для их пополнения. Администрация не несёт ответственности за содержание, доступность и политику сторонних ресурсов, включая работоспособность сервисов Steam/Valve и Telegram/Fragment.</p>
+    <h2>6. Ссылки и интеграции со сторонними сервисами</h2>
+    <p>Сайт использует платёжный сервис <b>Digiseller</b> (он же Plati.Market) для приёма оплаты и доставки цифровых товаров по всем заказам. Использование Digiseller дополнительно регулируется его собственными правилами и политикой конфиденциальности. Администрация не несёт ответственности за содержание, доступность и политику сторонних ресурсов, включая работоспособность сервисов Steam/Valve, Telegram, Spotify, Roblox и т.п.</p>
 
     <h2>7. Изменение условий</h2>
     <p>Администрация вправе в любое время в одностороннем порядке изменять условия настоящего Соглашения без предварительного уведомления. Продолжение использования Сайта после публикации изменений означает согласие Пользователя с новой редакцией.</p>
@@ -799,26 +1185,26 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 <template id="tpl-refund">
 <div class="legal-doc">
     <h1>Возврат и обмен</h1>
-    <p class="meta">Редакция от 27 августа 2026 г.</p>
-    <div class="notice">Duskey — прямой продавец: оплату по всем разделам принимает сам Сайт, поэтому и возврат в спорных случаях оформляется здесь же, без сторонних площадок.</div>
+    <p class="meta">Редакция от 28 августа 2026 г.</p>
+    <div class="notice">Оплата по всем заказам Сайта принимается через Digiseller. По общему правилу цифровой товар надлежащего качества, уже переданный покупателю, возврату не подлежит — см. п. 1. Если заказ не дошёл или оказался нерабочим не по вашей вине, обращайтесь в поддержку Сайта — см. п. 2.</div>
 
-    <h2>1. Пополнение Steam: общий принцип</h2>
-    <p>Если средства успешно зачислены на указанный Steam-аккаунт, услуга считается оказанной надлежащим образом, а пополнение баланса как таковое — цифровая услуга, исполненная в момент зачисления, — возврату не подлежит (п. 4 ст. 26.1 Закона РФ «О защите прав потребителей»), в том числе если Пользователь указал неверный логин Steam.</p>
+    <h2>1. Общий принцип</h2>
+    <p>В соответствии с п. 4 ст. 26.1 Закона РФ «О защите прав потребителей», цифровой товар надлежащего качества, переданный покупателю (например, активированный ключ, код), возврату и обмену не подлежит, если иное прямо не предусмотрено правилами площадки, на которой была совершена покупка.</p>
 
-    <h2>2. Пополнение Steam: когда возврат положен</h2>
+    <h2>2. Когда возврат положен и куда обращаться</h2>
+    <p>Продавец всех товаров Сайта — Владелец Сайта, оплата принимается через Digiseller. Возврат оформляется через поддержку Сайта в следующих случаях:</p>
     <ul>
-        <li><b>Деньги списаны, зачисление не произошло</b> — например, статус заказа остался «FAIL» или платёж завис дольше 24 часов без подтверждения. Средства возвращаются на способ оплаты через Antilopay (запрос возврата/отмены) после подтверждения технического сбоя.</li>
-        <li><b>Двойное списание по одному заказу</b> — по техническому сбою на стороне платёжной системы. Излишне списанная сумма возвращается тем же способом.</li>
-        <li><b>Ошибка в логине допущена по вине Сайта</b> (например, подтверждено логирование иного значения, чем ввёл Пользователь) — Владелец Сайта организует возврат или повторное зачисление на верный аккаунт.</li>
+        <li><b>Деньги списаны, товар не доставлен</b> — например, заказ на Digiseller завис в обработке дольше 24 часов без подтверждения.</li>
+        <li><b>Двойное списание по одному заказу</b> — по техническому сбою на стороне платёжной системы.</li>
+        <li><b>Переданный код/товар оказался нерабочим или уже активированным</b> не по вине покупателя.</li>
+        <li><b>Товар не соответствует описанию</b> в карточке на Сайте.</li>
     </ul>
-    <p>Заявка на возврат подаётся в поддержку Сайта (п. 4) с указанием номера заказа (order_id из письма/чека или ссылки на оплату) и обстоятельств. Срок рассмотрения — до 10 рабочих дней; фактический возврат средств зависит от сроков платёжного провайдера и банка-эмитента (обычно до 30 календарных дней).</p>
+    <p>Если Пользователь указал при оформлении заказа неверные данные (логин Steam, username Telegram и т.п.) и товар по ним уже зачислен/выдан, — возврат не производится: услуга считается оказанной надлежащим образом, ответственность за правильность данных несёт Пользователь.</p>
+    <p>Заявка на возврат подаётся в поддержку Сайта (п. 3) с указанием номера заказа (из письма/чека Digiseller) и обстоятельств. Срок рассмотрения — до 10 рабочих дней; фактический возврат средств зависит от сроков платёжного оператора и банка-эмитента (обычно до 30 календарных дней).</p>
 
-    <h2>3. Звёзды Telegram (раздел временно недоступен)</h2>
-    <p>Раздел пока не принимает оплату, поэтому правила возврата по нему не применяются. Они будут опубликованы здесь перед запуском продаж через сервис Fragment.</p>
-
-    <h2>4. Контакты</h2>
+    <h2>3. Контакты</h2>
     <div class="req">
-        <p><b>По возврату и по вопросам работы Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
+        <p><b>По возврату и вопросам работы Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
     </div>
 </div>
 </template>
@@ -835,23 +1221,26 @@ const ICONS = {
     chip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></svg>',
     play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.5 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg>',
     key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M17 15l2.5 2.5M14 12l2.5 2.5"/></svg>',
+    crown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l4 3 5-6 5 6 4-3-2 10H5z"/><path d="M5 21h14"/></svg>',
+    bot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none"/><path d="M9 18h6"/></svg>',
 };
 
-// ---- быстрая покупка (Steam / Stars) — первое, что видит человек ----
+// ---- быстрая покупка (Steam / Stars) — первое, что видит человек.
+// Оба товара продаёт Владелец Сайта, оплата — через Digiseller ----
 const quickBuyProducts = {
     steam: {
         label: 'Steam', title: 'Пополнение Steam', icon: ICONS.wallet,
         amounts: [100, 300, 500, 1000],
-        unit: '₽', rate: 1, // без наценки — оплата идёт напрямую через Antilopay
+        unit: '₽', rate: 1,
         placeholder: 'Логин Steam',
-        api: true, // обрабатывается собственным бэкендом (Antilopay), а не аффилиат-ссылкой
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=5855479&ai=1108558',
     },
     stars: {
         label: 'Telegram Stars', title: 'Звёзды Telegram', icon: ICONS.star,
         amounts: [50, 100, 250, 500],
         unit: '⭐', rate: 1.5, // ₽ за звезду для отображения итога
         placeholder: 'Username в Telegram',
-        stub: true, // покупка через Fragment ещё не подключена — раздел-заглушка
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=5412816&ai=1108558',
     },
 };
 
@@ -877,15 +1266,11 @@ function qbSyncAmountUI() {
     });
 
     const buyBtn = document.getElementById('qbBuy');
-    if (product.stub) {
-        buyBtn.textContent = 'Скоро';
-        buyBtn.disabled = true;
-        buyBtn.onclick = null;
-    } else if (amount > 0) {
+    if (amount > 0) {
         const total = product.unit === '₽' ? amount : Math.round(amount * product.rate);
         buyBtn.textContent = `Купить за ${total} ₽`;
         buyBtn.disabled = false;
-        buyBtn.onclick = () => handleSteamPurchase(amount);
+        buyBtn.onclick = () => openExternalPurchase(product.url);
     } else {
         buyBtn.textContent = 'Введите сумму';
         buyBtn.disabled = true;
@@ -898,55 +1283,6 @@ function qbSetStatus(message, kind) {
     el.textContent = message || '';
     el.classList.toggle('is-error', kind === 'error');
     el.classList.toggle('is-ok', kind === 'ok');
-}
-
-// Реальное пополнение Steam через собственный бэкенд (routes/steamTopup.js →
-// Antilopay API). В отличие от остальных карточек каталога, эта покупка не
-// уходит на сторонний маркетплейс — деньги и данные обрабатывает наш сервер.
-async function handleSteamPurchase(amount) {
-    const buyBtn = document.getElementById('qbBuy');
-    const steamAccount = document.getElementById('qbInput').value.trim();
-
-    if (!steamAccount) {
-        qbSetStatus('Укажите логин Steam', 'error');
-        document.getElementById('qbInput').focus();
-        return;
-    }
-
-    const originalLabel = buyBtn.textContent;
-    buyBtn.disabled = true;
-    buyBtn.textContent = 'Проверяем аккаунт…';
-    qbSetStatus('');
-
-    try {
-        const checkRes = await fetch('/steam/check-account', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ steam_account: steamAccount }),
-        });
-        if (!checkRes.ok) {
-            const err = await checkRes.json().catch(() => ({}));
-            throw new Error(err.error || 'Аккаунт не найден или недоступен для пополнения');
-        }
-
-        buyBtn.textContent = 'Создаём платёж…';
-        const createRes = await fetch('/steam/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ steam_account: steamAccount, topup_amount: amount }),
-        });
-        const data = await createRes.json();
-        if (!createRes.ok || !data.ok) {
-            throw new Error(data.error || 'Не удалось создать платёж');
-        }
-
-        qbSetStatus('Переходим к оплате…', 'ok');
-        window.location.href = data.payment_url;
-    } catch (e) {
-        qbSetStatus(e.message || 'Что-то пошло не так, попробуйте ещё раз', 'error');
-        buyBtn.disabled = false;
-        buyBtn.textContent = originalLabel;
-    }
 }
 
 function renderQuickBuy() {
@@ -970,7 +1306,7 @@ function renderQuickBuy() {
     document.getElementById('qbInputWrap').querySelectorAll('svg').forEach(s => s.remove());
     document.getElementById('qbInputWrap').insertAdjacentHTML('afterbegin', product.icon);
 
-    qbSetStatus(product.stub ? 'Покупка звёзд скоро появится — раздел пока в разработке' : '');
+    qbSetStatus('');
 
     qbSyncAmountUI();
 
@@ -1006,54 +1342,649 @@ themeToggle.addEventListener('click', () => {
     themeKnob.innerHTML = next === 'dark' ? MOON : SUN;
 });
 
+// ===== ПАРТНЁРСКАЯ ССЫЛКА =====
+// Впиши свой ID/параметр перед публикацией — сверь имя параметра (ref)
+// в личном кабинете своей площадки-поставщика.
+const PARTNER_REF = 'ВАШ_ПАРТНЁРСКИЙ_ID'; // TODO: вставь свой ref/partner ID
+const REF_PARAM = 'ref';
+
+function buildAffiliateUrl(baseUrl) {
+    if (!baseUrl || baseUrl === '#') return '#';
+    try {
+        const url = new URL(baseUrl);
+        if (PARTNER_REF && PARTNER_REF !== 'ВАШ_ПАРТНЁРСКИЙ_ID') url.searchParams.set(REF_PARAM, PARTNER_REF);
+        return url.toString();
+    } catch { return baseUrl; }
+}
+
+// ===== ССЫЛКА НА TELEGRAM-БОТА =====
+// Куда ведёт кнопка «Вернуться в бота» во всплывающей плашке после
+// перехода на оплату через Digiseller. Мы не можем заставить
+// их страницу оплаты редиректнуть обратно в бота — этот редирект
+// настраивается продавцом на стороне самой площадки, а не по ссылке —
+// поэтому даём свой способ вернуться, полностью на нашей стороне.
+const TELEGRAM_BOT_URL = 'https://t.me/Duskey_Bot';
+
+const returnToast = document.getElementById('returnToast');
+const returnToastBtn = document.getElementById('returnToastBtn');
+const returnToastClose = document.getElementById('returnToastClose');
+let returnToastTimer = null;
+
+if (TELEGRAM_BOT_URL && TELEGRAM_BOT_URL !== 'https://t.me/ВАШ_БОТ') {
+    returnToastBtn.href = TELEGRAM_BOT_URL;
+} else {
+    // ссылка ещё не настроена — не подсовываем пользователю мёртвую кнопку
+    returnToastBtn.href = '#';
+    returnToastBtn.setAttribute('aria-disabled', 'true');
+    returnToastBtn.style.opacity = '0.5';
+    returnToastBtn.style.pointerEvents = 'none';
+}
+
+function showReturnToast() {
+    returnToast.classList.add('is-visible');
+    clearTimeout(returnToastTimer);
+    returnToastTimer = setTimeout(() => returnToast.classList.remove('is-visible'), 14000);
+}
+returnToastClose.addEventListener('click', () => {
+    clearTimeout(returnToastTimer);
+    returnToast.classList.remove('is-visible');
+});
+
+// единая точка выхода на внешнюю площадку — открывает ссылку в новом
+// окне и сразу показывает плашку с быстрым возвратом в бота
+function openExternalPurchase(url) {
+    window.open(buildAffiliateUrl(url), '_blank', 'noopener');
+    showReturnToast();
+}
+
+// ===== КАРТОЧКА ТОВАРА ПАРТНЁРА (модалка) =====
+// Пытаемся вживую отрисовать официальный виджет Digiseller внутри
+// модалки: их скрипт store2/digiseller-api.js.asp сканирует страницу на
+// элементы .digiseller-buy-standalone только в момент своей загрузки, а
+// наш элемент появляется в DOM позже (при открытии модалки) — поэтому
+// каждый раз пересоздаём их <script> тег заново, это заставляет браузер
+// выполнить его ещё раз и найти новый элемент. Если за разумное время
+// виджет не отрисовался (например, скрипт Digiseller недоступен) — под
+// ним всегда остаётся рабочая кнопка-страховка на прямую ссылку оплаты,
+// так что покупка не блокируется в любом случае.
+const pmOverlay = document.getElementById('pmOverlay');
+const pmModal = document.getElementById('pmModal');
+let pmWidgetCheckTimer = null;
+
+function digisellerIdFromUrl(url) {
+    try { return new URL(url).searchParams.get('id_d'); } catch { return null; }
+}
+
+function closeProductModal() {
+    pmOverlay.classList.remove('is-open');
+    document.body.style.overflow = '';
+    clearTimeout(pmWidgetCheckTimer);
+}
+
+function tryRenderDigisellerWidget() {
+    const oldJs = document.getElementById('digiseller-js');
+    if (oldJs) oldJs.remove();
+    if (!document.getElementById('digiseller-css')) {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet'; css.id = 'digiseller-css';
+        css.href = '//shop.digiseller.com/xml/store2_css.asp?seller_id=1108558';
+        document.head.appendChild(css);
+    }
+    const js = document.createElement('script');
+    js.id = 'digiseller-js'; js.async = true;
+    // "_" — просто чтобы браузер не отдал старый выполненный скрипт из bfcache
+    js.src = '//digiseller.com/store2/digiseller-api.js.asp?seller_id=1108558&lang=ru-RU&_=' + Date.now();
+    document.head.appendChild(js);
+
+    clearTimeout(pmWidgetCheckTimer);
+    const start = Date.now();
+    const check = () => {
+        const wrap = document.getElementById('pmWidgetWrap');
+        if (!wrap) return; // модалку уже закрыли
+        const widgetEl = wrap.querySelector('.digiseller-buy-standalone');
+        const rendered = widgetEl && widgetEl.children.length > 0;
+        if (rendered) {
+            widgetEl.style.display = '';
+            const loading = wrap.querySelector('.pm-widget-loading');
+            if (loading) loading.remove();
+            return;
+        }
+        if (Date.now() - start > 4000) {
+            const loading = wrap.querySelector('.pm-widget-loading');
+            if (loading) loading.innerHTML = '<span>Живой предпросмотр недоступен — воспользуйтесь кнопкой ниже</span>';
+            return;
+        }
+        pmWidgetCheckTimer = setTimeout(check, 300);
+    };
+    pmWidgetCheckTimer = setTimeout(check, 300);
+}
+
+function openProductModal(item) {
+    const digisellerId = digisellerIdFromUrl(item.url);
+    const payUrl = buildAffiliateUrl(item.url);
+
+    pmModal.innerHTML = `
+        <div class="pm-head">
+            <span class="pm-ic">${item.icon}</span>
+            <div class="pm-head-text">
+                <div class="pm-title">${item.name}</div>
+                <div class="pm-sub">${item.meta || ''}</div>
+            </div>
+            <button type="button" class="pm-close" id="pmClose" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="pm-widget-wrap" id="pmWidgetWrap">
+            <div class="pm-widget-loading"><span class="pm-spin"></span><span>Загружаем карточку оплаты…</span></div>
+            ${digisellerId ? `<div class="digiseller-buy-standalone" data-id="${digisellerId}" data-ai="1108558" data-img="1" data-img-size="180" data-name="1" data-price="1" data-owner="1" data-no-price="0" style="display:none"></div>` : ''}
+        </div>
+        <a class="pm-fallback" id="pmFallback" href="${payUrl}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+            <span>Перейти к оплате</span>
+        </a>
+        <p class="pm-note">Оплата принимается на защищённой странице Digiseller — это платёжный оператор Сайта, продавец товара — Duskey</p>
+    `;
+
+    document.getElementById('pmClose').addEventListener('click', closeProductModal);
+    document.getElementById('pmFallback').addEventListener('click', () => { showReturnToast(); });
+
+    pmOverlay.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+
+    if (digisellerId) tryRenderDigisellerWidget();
+}
+
+pmOverlay.addEventListener('click', (e) => { if (e.target === pmOverlay) closeProductModal(); });
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pmOverlay.classList.contains('is-open')) closeProductModal();
+});
+
 // ===== КАТАЛОГ ТОВАРОВ =====
-// Все внешние (GGSel) карточки убраны — Duskey с GGSel больше не связан.
-// Остаётся ровно 2 карточки, обе ведут не на внешний сайт, а на виджет
-// быстрой покупки выше (action = ключ в quickBuyProducts): клик скроллит
-// к виджету и переключает нужную вкладку, а не открывает новую вкладку.
+// Продавец всех товаров ниже — Владелец Сайта; оплата по каждому проходит
+// через Digiseller. У карточки один из двух путей открытия:
+//  - key → внутренняя быстрая покупка (Steam/Stars-виджет выше) —
+//          клик скроллит к виджету и переключает вкладку;
+//  - url → карточка товара открывается в модалке (openProductModal) с
+//          живым виджетом Digiseller и кнопкой-страховкой на оплату.
 const catalog = [
-    { icon: ICONS.wallet, name: 'Пополнение Steam', meta: 'Мгновенно, оплата на сайте', priceLabel: 'от 100 ₽', category: 'topup', action: 'steam' },
-    { icon: ICONS.star, name: 'Звёзды Telegram', meta: 'Через Fragment — скоро', priceLabel: 'Скоро', category: 'stars', action: 'stars', stub: true },
+    { key: 'steam', icon: ICONS.wallet, name: 'Пополнение Steam', meta: 'Мгновенно, на ваш логин', priceLabel: 'от 100 ₽', category: 'topup', hit: true },
+    { key: 'stars', icon: ICONS.star, name: 'Telegram Stars', meta: 'Для профиля и каналов', priceLabel: 'от 50 ⭐', category: 'telegram', hit: false },
+    {
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=4677311&ai=1108558',
+        icon: ICONS.crown, name: 'Telegram Premium', meta: '3 / 6 / 12 мес., без входа в аккаунт',
+        priceLabel: 'от 1299 ₽', category: 'telegram', hit: true,
+    },
+    {
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=3427397&ai=1108558',
+        icon: ICONS.headphones, name: 'Spotify Premium', meta: '1–12 мес., Individual / Duo / Family, нужен вход',
+        priceLabel: 'от 226 ₽', category: 'subs', hit: false,
+    },
+    {
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=4023986&ai=1108558',
+        icon: ICONS.chip, name: 'Claude AI Pro / Max', meta: 'Подписка 24/7, есть вариант без входа',
+        priceLabel: 'от 1949 ₽', category: 'subs', hit: true,
+    },
+    {
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=4362367&ai=1108558',
+        icon: ICONS.bot, name: 'ChatGPT Plus / Pro', meta: '5.6, Go, Pro 5x / 20x, Sora — 24/7, без входа',
+        priceLabel: 'от 879 ₽', category: 'subs', hit: false,
+    },
+    {
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=5933050&ai=1108558',
+        icon: ICONS.gem, name: 'Robux', meta: 'Roblox Global, 80–22500, нужен логин и пароль',
+        priceLabel: 'от 100 ₽', category: 'topup', hit: false,
+    },
 ];
 
-const categoryLabels = { topup: 'Пополнение', stars: 'Звёзды' };
+const categoryLabels = { topup: 'Пополнение', telegram: 'Telegram', subs: 'Подписки' };
+
+// ---- «умный» поиск: словарь синонимов и вариантов написания ----
+// Каждая группа — слова/фразы, которые при поиске считаются одним и тем
+// же. Если название/описание товара (или вкладки быстрой покупки)
+// содержит хотя бы одно слово из группы, все остальные слова группы
+// добавляются в его поисковый профиль. Поэтому "телеграм звезды",
+// "звезды телеграм" и "telegram stars" находят один и тот же товар вне
+// зависимости от языка, порядка слов и раскладки.
+// Чтобы добавить поддержку нового товара — просто допишите сюда группу.
+const SEARCH_SYNONYMS = [
+    ['telegram', 'телеграм', 'телеграмм', 'тг'],
+    ['stars', 'звезды', 'звёзды', 'звезда', 'звёзда'],
+    ['premium', 'премиум'],
+    ['playstation', 'ps store', 'пс стор', 'плейстейшн', 'плейстейшен', 'сони', 'sony', 'пс'],
+    ['spotify', 'спотифай', 'спотифи'],
+    ['xbox', 'иксбокс'],
+    ['game pass', 'геймпасс', 'гейм пасс', 'гамепасс'],
+    ['chatgpt', 'чатгпт', 'чат гпт', 'gpt', 'гпт', 'openai', 'опенай'],
+    ['youtube', 'ютуб', 'ютьюб'],
+    ['steam', 'стим'],
+    ['epic', 'эпик', 'epic games', 'эпик геймс'],
+];
+
+// добавляет к тексту все синонимы из групп, которые в нём нашлись —
+// используется и для карточек каталога, и для вкладок быстрой покупки
+function expandWithSynonyms(text) {
+    let extra = '';
+    for (const group of SEARCH_SYNONYMS) {
+        if (group.some((term) => text.includes(term))) extra += ' ' + group.join(' ');
+    }
+    return text + extra;
+}
+
+// поисковый профиль товара считается один раз и переиспользуется —
+// не пересобирать строку на каждое нажатие клавиши
+catalog.forEach((item) => {
+    item._search = expandWithSynonyms(`${item.name} ${item.meta || ''} ${categoryLabels[item.category]}`.toLowerCase());
+});
+
+// то же самое для вкладок быстрой покупки (Steam / Telegram Stars) — они
+// не карточки в сетке каталога, но поиск должен уметь их находить и
+// предлагать перейти к ним (см. renderSearchSuggestion)
+const quickBuySearchProfiles = {};
+Object.entries(quickBuyProducts).forEach(([key, p]) => {
+    quickBuySearchProfiles[key] = expandWithSynonyms(`${p.label} ${p.title}`.toLowerCase());
+});
+
+const categories = [
+    { id: 'all', label: 'Все' },
+    { id: 'topup', label: 'Пополнения' },
+    { id: 'telegram', label: 'Telegram' },
+    { id: 'subs', label: 'Подписки' },
+];
+
+let activeCategory = 'all';
+let searchQuery = '';
+
+function renderFilters() {
+    const row = document.getElementById('filterRow');
+    row.innerHTML = categories.map((c, i) => `
+        <button type="button" class="filter-chip${c.id === activeCategory ? ' is-active' : ''}" data-cat="${c.id}" style="animation-delay:${i * 35}ms">${c.label}</button>
+    `).join('');
+    row.querySelectorAll('.filter-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+            activeCategory = chip.dataset.cat;
+            renderFilters();
+            renderCatalog();
+            dismissSwipeHint();
+        });
+    });
+    updateFilterScrollUI();
+}
+
+// ---- скролл фильтров: точка-подсказка появляется только когда есть
+// что прокручивать, лёгкая пульсация при загрузке, если ряд не влезает ----
+const filterRow = document.getElementById('filterRow');
+const filterSwipeHint = document.getElementById('filterSwipeHint');
+const filterSwipeBtn = document.getElementById('filterSwipeBtn');
+const filterSwipePop = document.getElementById('filterSwipePop');
+const filterSwipePopClose = document.getElementById('filterSwipePopClose');
+let swipeHintDismissed = false;
+let swipeHintShown = false; // has it appeared at least once — gates the pulse to a single run
+
+function closeSwipePop() {
+    filterSwipePop.classList.remove('is-open');
+}
+
+function dismissSwipeHint() {
+    closeSwipePop();
+    if (swipeHintDismissed) return;
+    swipeHintDismissed = true;
+    filterSwipeHint.classList.remove('is-visible');
+}
+
+// tap the dot: explain itself in one line instead of just vanishing —
+// the person can read it and dismiss, or tap elsewhere and it stays put
+filterSwipeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    filterSwipeHint.classList.remove('is-nudging');
+    filterSwipePop.classList.toggle('is-open');
+});
+filterSwipePopClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dismissSwipeHint();
+});
+document.addEventListener('click', (e) => {
+    if (filterSwipePop.classList.contains('is-open') && !filterSwipeHint.contains(e.target)) {
+        closeSwipePop();
+    }
+});
+
+function updateFilterScrollUI() {
+    const maxScroll = filterRow.scrollWidth - filterRow.clientWidth;
+    const canScroll = maxScroll > 4;
+
+    // stays up for as long as it takes to notice — only goes away once the
+    // person actually scrolls, drags, or taps it through.
+    // it pulses itself just once on first appearance, then holds still.
+    if (canScroll && !swipeHintDismissed) {
+        filterSwipeHint.classList.add('is-visible');
+        if (!swipeHintShown) {
+            swipeHintShown = true;
+            requestAnimationFrame(() => filterSwipeHint.classList.add('is-nudging'));
+        }
+    } else if (!canScroll) {
+        filterSwipeHint.classList.remove('is-visible');
+    }
+}
+
+let scrollUiQueued = false;
+filterRow.addEventListener('scroll', () => {
+    dismissSwipeHint();
+    // scroll fires far more often than the UI needs to update — batching
+    // the read/write into one rAF per frame keeps this cheap on weak phones
+    if (scrollUiQueued) return;
+    scrollUiQueued = true;
+    requestAnimationFrame(() => { updateFilterScrollUI(); scrollUiQueued = false; });
+}, { passive: true });
+window.addEventListener('resize', updateFilterScrollUI);
+
+// drag-to-scroll with a mouse (touch/trackpad already scroll natively)
+let dragState = null;
+filterRow.addEventListener('mousedown', (e) => {
+    dragState = { startX: e.pageX, startScroll: filterRow.scrollLeft };
+    filterRow.classList.add('is-grabbing');
+    dismissSwipeHint();
+});
+window.addEventListener('mousemove', (e) => {
+    if (!dragState) return;
+    filterRow.scrollLeft = dragState.startScroll - (e.pageX - dragState.startX);
+});
+window.addEventListener('mouseup', () => {
+    dragState = null;
+    filterRow.classList.remove('is-grabbing');
+});
+
+// подсвечивает вхождения запроса в тексте — по каждому слову запроса
+// отдельно, поэтому "spotify подписка" подсветит оба слова в названии/мете
+function highlightMatch(text, words) {
+    if (!words.length) return text;
+    // сортируем по длине по убыванию, чтобы более длинное слово не резалось
+    // более коротким при пересечении диапазонов
+    const pattern = words
+        .slice()
+        .sort((a, b) => b.length - a.length)
+        .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|');
+    const re = new RegExp(`(${pattern})`, 'gi');
+    return text.replace(re, '<mark>$1</mark>');
+}
 
 function renderCatalog() {
     const grid = document.getElementById('catalogGrid');
-    document.getElementById('catalogTitle').textContent = `Все товары · ${catalog.length}`;
+    // ищем по каждому слову запроса отдельно (а не по фразе целиком) — так
+    // "подписка spotify" и "spotify подписка" находят один и тот же товар;
+    // синонимы (см. SEARCH_SYNONYMS) уже вшиты в item._search заранее
+    const words = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let items = activeCategory === 'all' ? catalog : catalog.filter((i) => i.category === activeCategory);
+    if (words.length) items = items.filter((i) => words.every((w) => i._search.includes(w)));
 
-    grid.innerHTML = catalog.map((item, i) => `
-        <article class="card" style="animation-delay:${Math.min(i * 35, 280)}ms">
+    renderSearchSuggestion(words);
+
+    document.getElementById('catalogTitle').textContent = `Все товары · ${items.length}`;
+
+    if (items.length === 0) {
+        grid.innerHTML = `
+            <div class="catalog-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <span>Ничего не нашлось по запросу «${searchQuery.trim()}»</span>
+            </div>`;
+        return;
+    }
+
+    grid.innerHTML = items.map((item, i) => `
+        <article class="card" style="animation-delay:${Math.min(i * 35, 280)}ms" data-key="${item.key || ''}" data-url="${item.url || ''}" role="button" tabindex="0">
             <div class="card-visual cat-${item.category}">
                 <div class="card-visual-top">
                     <span class="cat-label">${categoryLabels[item.category]}</span>
-                    ${item.stub ? '<span class="top-tag">Скоро</span>' : ''}
+                    ${item.hit ? '<span class="top-tag">Топ</span>' : ''}
                 </div>
                 <div class="icon-plate"><span class="glyph">${item.icon}</span></div>
             </div>
             <div class="card-accent cat-${item.category}"></div>
             <div class="card-info">
-                <div class="card-name">${item.name}</div>
+                <div class="card-name">${highlightMatch(item.name, words)}</div>
                 <span class="card-meta">${item.meta || ''}</span>
                 <div class="card-foot">
-                    <span class="card-price">${item.priceLabel}</span>
-                    <button type="button" class="btn-buy${item.stub ? ' is-disabled' : ''}" data-action="${item.action}"${item.stub ? ' disabled' : ''}>${item.stub ? 'Скоро' : 'Купить'}</button>
+                    <span class="card-price">${item.priceLabel.replace(/^от\s*/i, '')}</span>
+                    <span class="btn-buy">Купить</span>
                 </div>
             </div>
         </article>
     `).join('');
 
-    grid.querySelectorAll('.btn-buy[data-action]:not(.is-disabled)').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            qbActiveTab = btn.dataset.action;
-            renderQuickBuy();
-            document.getElementById('quickbuySection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // карточка целиком кликабельна: с key ведёт к виджету быстрой покупки
+    // (goToQuickBuy), с url — открывает карточку товара в
+    // модалке (openProductModal), откуда уже идёт переход к оплате
+    grid.querySelectorAll('.card').forEach((el) => {
+        const item = items.find((it) => (it.key || '') === el.dataset.key && (it.url || '') === el.dataset.url);
+        const handler = () => {
+            if (el.dataset.key) goToQuickBuy(el.dataset.key);
+            else if (item) openProductModal(item);
+        };
+        el.addEventListener('click', handler);
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
         });
     });
 }
 
+// ---- нечёткое сравнение слов (опечатки, кривая раскладка и т.п.) ----
+// расстояние Дамерау-Левенштейна (учитывает соседнюю перестановку букв —
+// самый частый тип опечатки, "stars" -> "stras" — как одну правку, а не
+// две), нормализованное в 0..1, где 1 — слова идентичны.
+function editDistance(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(
+                dp[i - 1][j] + 1,      // удаление
+                dp[i][j - 1] + 1,      // вставка
+                dp[i - 1][j - 1] + cost // замена
+            );
+            if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+                dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1); // соседняя перестановка
+            }
+        }
+    }
+    return dp[m][n];
+}
+function wordSimilarity(a, b) {
+    if (!a.length && !b.length) return 1;
+    return 1 - editDistance(a, b) / Math.max(a.length, b.length);
+}
+
+// FUZZY_STRONG: хотя бы одно слово запроса должно уверенно опознать товар
+// (иначе "телеграм пицца" тоже нашло бы Stars только по слову "телеграм").
+// FUZZY_FLOOR: слова короче него по смыслу не считаем совпадением вообще —
+// это фильтр случайных совпадений, а не опечаток.
+const FUZZY_STRONG = 0.78;
+const FUZZY_FLOOR = 0.5;
+const FUZZY_MIN_WORD_LEN = 3; // короткие слова (1-2 буквы) нечётко не сравниваем — слишком много случайных совпадений
+
+function bestTokenSimilarity(word, tokens) {
+    let best = 0;
+    for (const token of tokens) {
+        if (word === token) return 1;
+        if (token.length >= FUZZY_MIN_WORD_LEN && (token.includes(word) || word.includes(token))) {
+            best = Math.max(best, 0.9);
+            continue;
+        }
+        best = Math.max(best, wordSimilarity(word, token));
+    }
+    return best;
+}
+
+// нечёткий поиск только среди товаров быстрой покупки (Steam / TG Stars) —
+// их всего два, поэтому на выходе никогда не будет больше 2 карточек
+function fuzzyMatchQuickBuy(words) {
+    const candidates = [];
+    for (const key of Object.keys(quickBuySearchProfiles)) {
+        const tokens = [...new Set(quickBuySearchProfiles[key].split(/\s+/).filter(Boolean))];
+        const scores = words
+            .filter((w) => w.length >= FUZZY_MIN_WORD_LEN)
+            .map((w) => bestTokenSimilarity(w, tokens));
+
+        if (!scores.length) continue;
+        // ни одно слово запроса не должно быть совсем "мимо" — иначе
+        // случайный лишний хвост в запросе всё равно даст совпадение
+        if (scores.some((s) => s < FUZZY_FLOOR)) continue;
+        // но хотя бы одно слово должно уверенно опознавать товар
+        if (Math.max(...scores) < FUZZY_STRONG) continue;
+
+        const score = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+        candidates.push({ key, score });
+    }
+    return candidates.sort((a, b) => b.score - a.score);
+}
+
+// если запрос совпадает (точно или по смыслу, с опечатками) с тем, что
+// живёт в блоке быстрой покупки (Steam / Telegram Stars) — а не в сетке
+// каталога — предлагаем сразу перейти туда карточкой-подсказкой, вместо
+// того чтобы человек упирался в "ничего не найдено". Карточек никогда не
+// больше 2 — это все товары, у которых вообще есть быстрая покупка.
+// подсказка появляется не с первой буквы, а только когда в запросе
+// накопилось хотя бы MIN_SUGGEST_CHARS символов — иначе на "с" или "st"
+// она выскакивала бы почти всегда и раздражала
+const MIN_SUGGEST_CHARS = 4;
+
+function renderSearchSuggestion(words) {
+    const box = document.getElementById('qbSuggest');
+    if (!words.length || searchQuery.trim().length < MIN_SUGGEST_CHARS) { box.hidden = true; box.innerHTML = ''; return; }
+
+    // сначала точное совпадение слов — быстрее и надёжнее
+    let matches = Object.keys(quickBuySearchProfiles)
+        .filter((key) => words.every((w) => quickBuySearchProfiles[key].includes(w)))
+        .map((key) => ({ key, score: 1 }));
+
+    // ничего не нашлось буквально — пробуем нечёткое сравнение на опечатки
+    if (!matches.length) matches = fuzzyMatchQuickBuy(words);
+
+    if (!matches.length) { box.hidden = true; box.innerHTML = ''; return; }
+
+    box.hidden = false;
+    box.innerHTML = matches.map(({ key }) => {
+        const product = quickBuyProducts[key];
+        return `
+            <div class="qb-suggest-card" data-key="${key}">
+                <span class="qb-suggest-icon">${product.icon}</span>
+                <span class="qb-suggest-text">Возможно, вы ищете <b>${product.label}</b> — нажмите, чтобы купить</span>
+                <button type="button" class="qb-suggest-btn" tabindex="-1">Купить</button>
+            </div>
+        `;
+    }).join('');
+
+    box.querySelectorAll('.qb-suggest-card').forEach((el) => {
+        el.addEventListener('click', () => goToQuickBuy(el.dataset.key));
+    });
+}
+
+function goToQuickBuy(key) {
+    qbActiveTab = key;
+    renderQuickBuy();
+    const section = document.getElementById('quickbuySection');
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const card = document.querySelector('.quickbuy-card');
+    card.classList.remove('is-pinged');
+    // reflow, чтобы анимация могла запуститься повторно при повторном клике
+    void card.offsetWidth;
+    card.classList.add('is-pinged');
+}
+
 document.getElementById('toTopBtn').addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// ---- преимущества в шапке (trust-row): подсветка сама переключается
+// по кругу каждые несколько секунд, чтобы пользователь вообще заметил,
+// что карточки не просто декоративные. Клик по карточке подсвечивает
+// именно её и просто сбивает таймер — автопрокрутка не останавливается,
+// а продолжает цикл дальше от той карточки, на которую нажали ----
+const trustItems = Array.from(document.querySelectorAll('.trust-item'));
+let trustIndex = -1;
+let trustTimer = null;
+const TRUST_INTERVAL = 1800;
+
+function setActiveTrust(index) {
+    trustItems.forEach((item, i) => {
+        const active = i === index;
+        item.classList.toggle('is-active', active);
+        item.setAttribute('aria-pressed', String(active));
+    });
+}
+function stopTrustAuto() {
+    if (trustTimer) { clearInterval(trustTimer); trustTimer = null; }
+}
+function startTrustAuto() {
+    stopTrustAuto();
+    if (!trustItems.length) return;
+    trustTimer = setInterval(() => {
+        trustIndex = (trustIndex + 1) % trustItems.length;
+        setActiveTrust(trustIndex);
+    }, TRUST_INTERVAL);
+}
+
+if (trustItems.length) {
+    trustIndex = 0;
+    setActiveTrust(trustIndex);
+    startTrustAuto();
+}
+
+trustItems.forEach((item, i) => {
+    const toggle = () => {
+        trustIndex = i;
+        setActiveTrust(i);
+        // сбрасываем таймер, чтобы следующий авто-шаг снова считался
+        // полный интервал от момента клика, а не обрывал цикл
+        startTrustAuto();
+    };
+    item.addEventListener('click', toggle);
+    item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggle();
+        }
+    });
+});
+// не тратим циклы, пока вкладка неактивна
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopTrustAuto();
+    else if (!trustTimer) startTrustAuto();
+});
+
+const searchInput = document.getElementById('searchInput');
+const searchClear = document.getElementById('searchClear');
+const searchKbd = document.getElementById('searchKbd');
+// рендер каталога дебаунсится на 120мс — сейчас товаров мало и разница
+// незаметна, но при росте каталога ввод не будет дёргать перерисовку
+// на каждую нажатую клавишу
+let searchDebounce;
+searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value;
+    searchClear.classList.toggle('is-visible', searchQuery.length > 0);
+    searchKbd.classList.toggle('is-hidden', searchQuery.length > 0);
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(renderCatalog, 120);
+});
+searchClear.addEventListener('click', () => {
+    searchQuery = '';
+    searchInput.value = '';
+    searchClear.classList.remove('is-visible');
+    searchKbd.classList.remove('is-hidden');
+    renderCatalog();
+    searchInput.focus();
+});
+// "/" фокусирует поиск, Escape в поиске быстро его очищает — привычные
+// шорткаты, подсказка "/" видна в самом поле, пока оно пустое
+document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+    } else if (e.key === 'Escape' && document.activeElement === searchInput && searchQuery) {
+        searchClear.click();
+    }
 });
 
 // ---- юридические документы: открываются как оверлей поверх текущей
@@ -1062,55 +1993,35 @@ document.getElementById('toTopBtn').addEventListener('click', () => {
 const legalOverlay = document.getElementById('legalOverlay');
 const legalBody = document.getElementById('legalBody');
 const legalClose = document.getElementById('legalClose');
+const legalTabs = document.getElementById('legalTabs');
 
-// iOS Safari часто вообще замораживает touch-скролл при простом
-// document.body.style.overflow = 'hidden' — вместо этого фиксируем body
-// через position:fixed с сохранением текущей позиции прокрутки, а
-// восстанавливаем её при закрытии.
-let legalScrollY = 0;
-function lockBodyScroll() {
-    legalScrollY = window.scrollY || window.pageYOffset || 0;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${legalScrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-}
-function unlockBodyScroll() {
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    window.scrollTo(0, legalScrollY);
-}
-
+// all four documents now live behind one "Политики" entry point and are
+// switched via tabs inside the same modal, instead of four separate
+// footer links each opening the overlay from scratch
 function openLegal(docId) {
     const tpl = document.getElementById('tpl-' + docId);
     if (!tpl) return;
     legalBody.innerHTML = '';
-    if (docId !== 'hub') {
-        const back = document.createElement('button');
-        back.type = 'button';
-        back.className = 'legal-back';
-        back.dataset.doc = 'hub';
-        back.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Все документы';
-        legalBody.appendChild(back);
-    }
     legalBody.appendChild(tpl.content.cloneNode(true));
     legalBody.scrollTop = 0;
+    legalTabs.querySelectorAll('.legal-tab').forEach((tab) => {
+        tab.classList.toggle('is-active', tab.dataset.doc === docId);
+    });
     legalOverlay.classList.add('is-open');
-    lockBodyScroll();
+    document.body.style.overflow = 'hidden';
 }
 function closeLegal() {
     legalOverlay.classList.remove('is-open');
-    unlockBodyScroll();
+    document.body.style.overflow = '';
 }
 
-document.querySelectorAll('.footer-nav [data-doc]').forEach((btn) => {
-    btn.addEventListener('click', () => openLegal(btn.dataset.doc));
+document.getElementById('policiesBtn').addEventListener('click', () => openLegal('offer'));
+legalTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-doc]');
+    if (tab) openLegal(tab.dataset.doc);
 });
-// links *inside* a document (e.g. the offer pointing at the refund policy,
-// hub items, the "all documents" back button) share one delegated handler
-// so switching documents never closes the modal
+// links *inside* a document (e.g. the offer pointing at the refund policy)
+// use the same delegated handler so switching documents never closes the modal
 legalBody.addEventListener('click', (e) => {
     const link = e.target.closest('[data-doc]');
     if (link) openLegal(link.dataset.doc);
@@ -1122,6 +2033,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 renderQuickBuy();
+renderFilters();
 renderCatalog();
 </script>
 </body>
