@@ -13,6 +13,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<!-- Telegram Web App SDK — нужен, чтобы открывать внешние ссылки (оплату)
+     через Telegram.WebApp.openLink() вместо window.open(). Внутри Mini App
+     обычный window.open ведёт себя непредсказуемо: вместо внешнего браузера
+     может подменить содержимое самого мини-приложения чужой страницей —
+     это и был тот самый "белый экран, из которого не выйти". Скрипт грузим
+     и здесь, если открыто не в Telegram (обычный браузер) — просто не
+     инициализируется, ни на что не влияет. -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
 :root {
@@ -1374,10 +1382,29 @@ returnToastClose.addEventListener('click', () => {
     returnToast.classList.remove('is-visible');
 });
 
-// единая точка выхода на внешнюю площадку — открывает ссылку в новом
-// окне и сразу показывает плашку с быстрым возвратом в бота
+// ===== TELEGRAM WEB APP =====
+// tg — ссылка на объект SDK, если страница открыта внутри Telegram Mini
+// App; в обычном браузере (или если скрипт не догрузился) остаётся null,
+// и весь код ниже просто использует обычный window.open как раньше.
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if (tg) {
+    tg.ready();
+    tg.expand();
+}
+
+// единая точка выхода на внешнюю площадку — открывает ссылку на оплату
+// через Telegram.WebApp.openLink() внутри Mini App (это официальный способ
+// открыть внешний URL: сам решает, вывести во внешний браузер или в
+// системное окно Telegram, и не подменяет содержимое самого мини-аппа),
+// а вне Telegram — обычным window.open, как и раньше. Плашку с быстрым
+// возвратом в бота показываем в обоих случаях.
 function openExternalPurchase(url) {
-    window.open(buildAffiliateUrl(url), '_blank', 'noopener');
+    const target = buildAffiliateUrl(url);
+    if (tg && typeof tg.openLink === 'function') {
+        tg.openLink(target, { try_instant_view: false });
+    } else {
+        window.open(target, '_blank', 'noopener');
+    }
     showReturnToast();
 }
 
@@ -1421,7 +1448,17 @@ function openProductModal(item) {
     `;
 
     document.getElementById('pmClose').addEventListener('click', closeProductModal);
-    document.getElementById('pmFallback').addEventListener('click', () => { showReturnToast(); });
+    // внутри Telegram перехватываем клик и уводим через tg.openLink() вместо
+    // обычного перехода по href (тот самый "белый экран без выхода");
+    // href остаётся на месте как рабочий фолбэк вне Telegram и для
+    // долгого нажатия/копирования ссылки
+    document.getElementById('pmFallback').addEventListener('click', (e) => {
+        if (tg && typeof tg.openLink === 'function') {
+            e.preventDefault();
+            tg.openLink(payUrl, { try_instant_view: false });
+        }
+        showReturnToast();
+    });
 
     pmOverlay.classList.add('is-open');
     document.body.style.overflow = 'hidden';
