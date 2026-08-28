@@ -1386,12 +1386,43 @@ if (tg) {
 // а вне Telegram — обычным window.open, как и раньше.
 function openExternalPurchase(url) {
     const target = buildAffiliateUrl(url);
+    markPurchaseOpened();
     if (tg && typeof tg.openLink === 'function') {
         tg.openLink(target, { try_instant_view: false });
     } else {
         window.open(target, '_blank', 'noopener');
     }
 }
+
+// ---- возврат со страницы оплаты Digiseller ----
+// Прямые ссылки на pay.asp не поддерживают success_url/fail_url — Digiseller
+// сам решает, что показать после отмены оплаты, и это либо экран отмены на
+// их стороне, либо их собственная страница товара. Управлять этим шагом мы
+// не можем (это настройка на стороне Digiseller, а не в коде сайта).
+// Но вернуть человека в опрятное состояние НАШЕЙ страницы можем: как только
+// вкладка/Mini App снова становятся видимыми после перехода на оплату —
+// закрываем модалку товара, если она осталась открытой. Работает одинаково
+// и в обычном браузере (новая вкладка), и в Telegram (tg.openLink) — в обоих
+// случаях человек в итоге снова видит каталог, а не зависшую карточку.
+let pendingPurchaseAt = 0;
+const PURCHASE_MIN_AWAY_MS = 1200; // защита от случайных мгновенных переключений вкладки
+
+function markPurchaseOpened() {
+    pendingPurchaseAt = Date.now();
+}
+
+function handleReturnFromPurchase() {
+    if (!pendingPurchaseAt) return;
+    const elapsed = Date.now() - pendingPurchaseAt;
+    pendingPurchaseAt = 0;
+    if (elapsed < PURCHASE_MIN_AWAY_MS) return;
+    if (pmOverlay.classList.contains('is-open')) closeProductModal();
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) handleReturnFromPurchase();
+});
+window.addEventListener('focus', handleReturnFromPurchase);
 
 // ===== КАРТОЧКА ТОВАРА ПАРТНЁРА (модалка) =====
 // Раньше здесь пытались вживую отрисовать официальный виджет Digiseller —
@@ -1438,6 +1469,7 @@ function openProductModal(item) {
     // href остаётся на месте как рабочий фолбэк вне Telegram и для
     // долгого нажатия/копирования ссылки
     document.getElementById('pmFallback').addEventListener('click', (e) => {
+        markPurchaseOpened();
         if (tg && typeof tg.openLink === 'function') {
             e.preventDefault();
             tg.openLink(payUrl, { try_instant_view: false });
@@ -1447,6 +1479,7 @@ function openProductModal(item) {
     pmOverlay.classList.add('is-open');
     document.body.style.overflow = 'hidden';
 }
+
 
 pmOverlay.addEventListener('click', (e) => { if (e.target === pmOverlay) closeProductModal(); });
 document.addEventListener('keydown', (e) => {
