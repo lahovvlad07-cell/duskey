@@ -47,12 +47,11 @@ app.get('/steam/fail', (req, res) => {
 
 function renderRedirectPage({ title, heading, orderId }) {
   const safeOrderId = orderId ? String(orderId).replace(/[<>]/g, '') : '—';
-  // Раньше при отсутствии TELEGRAM_BOT_URL в переменных окружения кнопка
-  // вела на "/" — то есть на сам сайт (duskey.vercel.app), из-за чего
-  // после неудачной оплаты пользователя как будто "выкидывало" на сайт
-  // вместо бота. Теперь по умолчанию — прямая ссылка на бота; переменная
-  // окружения TELEGRAM_BOT_URL по-прежнему может её переопределить.
-  const botUrl = process.env.TELEGRAM_BOT_URL || 'https://t.me/duskey_bot';
+  // Кнопка ведёт обратно на сайт — так было изначально и так и должно
+  // оставаться: после оплаты (успешной или нет) человек возвращается на
+  // сам сайт, а не куда-то в сторону (бот здесь ни при чём — это отдельная
+  // история, не имеющая отношения к возврату со страницы оплаты).
+  const siteUrl = process.env.SITE_URL || '/';
   return `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
@@ -69,7 +68,7 @@ function renderRedirectPage({ title, heading, orderId }) {
   <div class="card">
     <h2>${heading}</h2>
     <p>Номер заказа: ${safeOrderId}</p>
-    <a class="btn" href="${botUrl}">Вернуться в бота</a>
+    <a class="btn" href="${siteUrl}">Вернуться на сайт</a>
   </div>
 </body></html>`;
 }
