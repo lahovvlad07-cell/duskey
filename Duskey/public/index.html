@@ -782,11 +782,9 @@ mark {
   .legal-modal-body { max-height: none; }
 }
 
-/* ---------- Карточка товара — открывается вместо прямого
-   перехода. Пытаемся вживую отрисовать официальный виджет Digiseller
-   (их скрипт сам подставит картинку/цену/кнопку «Купить»), а под ним
-   всегда держим свою кнопку-страховку на прямую ссылку оплаты — на
-   случай, если виджет не успел/не смог отрисоваться. ---------- */
+/* ---------- Карточка товара — открывается вместо прямого перехода.
+   Целиком своя разметка (без внешнего виджета Digiseller и его
+   картинки/названия) с одной кнопкой на прямую ссылку оплаты. ---------- */
 .pm-overlay {
   position: fixed; inset: 0; z-index: 55;
   background: rgba(4, 5, 14, 0.6);
@@ -827,28 +825,15 @@ mark {
 .pm-close svg { width: 15px; height: 15px; }
 .pm-close:hover { background: var(--surface-alt); color: var(--ink); }
 
-.pm-widget-wrap {
-  border-radius: 14px; background: #f4f5f9; padding: 12px;
-  min-height: 64px; display: flex; align-items: center; justify-content: center;
-  position: relative;
-}
-.pm-widget-wrap .digiseller-buy-standalone { width: 100%; }
-.pm-widget-loading {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 0.76rem; color: #6b6f80;
-}
-.pm-widget-loading .pm-spin {
-  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
-  border: 2px solid rgba(60,64,90,0.25); border-top-color: #3d4cd6;
-  animation: qbSpin 0.7s linear infinite;
-}
 .pm-fallback {
-  margin-top: 12px; display: flex; align-items: center; justify-content: center;
-  gap: 6px; font-size: 0.78rem; color: var(--accent); font-weight: 600;
-  text-decoration: none;
+  margin-top: 4px; display: flex; align-items: center; justify-content: center;
+  gap: 8px; width: 100%; padding: 13px 18px; border-radius: var(--radius-pill);
+  background: var(--accent); color: #fff; font-size: 0.92rem; font-weight: 700;
+  text-decoration: none; transition: transform 0.15s var(--ease), background 0.15s var(--ease);
 }
-.pm-fallback svg { width: 13px; height: 13px; }
-.pm-fallback:hover { text-decoration: underline; }
+.pm-fallback svg { width: 15px; height: 15px; }
+.pm-fallback:hover { background: var(--accent-deep); transform: translateY(-1px); }
+.pm-fallback:active { transform: translateY(0) scale(0.98); }
 .pm-note {
   margin-top: 12px; font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.5;
 }
@@ -988,8 +973,7 @@ mark {
     <button type="button" class="return-toast-close" id="returnToastClose" aria-label="Закрыть">×</button>
 </div>
 
-<!-- карточка товара с внешней площадки: пытаемся отрисовать живой
-     виджет Digiseller, содержимое собирает openProductModal() -->
+<!-- карточка товара с внешней площадки, содержимое собирает openProductModal() -->
 <div class="pm-overlay" id="pmOverlay">
     <div class="pm-modal" id="pmModal"></div>
 </div>
@@ -1398,69 +1382,26 @@ function openExternalPurchase(url) {
 }
 
 // ===== КАРТОЧКА ТОВАРА ПАРТНЁРА (модалка) =====
-// Пытаемся вживую отрисовать официальный виджет Digiseller внутри
-// модалки: их скрипт store2/digiseller-api.js.asp сканирует страницу на
-// элементы .digiseller-buy-standalone только в момент своей загрузки, а
-// наш элемент появляется в DOM позже (при открытии модалки) — поэтому
-// каждый раз пересоздаём их <script> тег заново, это заставляет браузер
-// выполнить его ещё раз и найти новый элемент. Если за разумное время
-// виджет не отрисовался (например, скрипт Digiseller недоступен) — под
-// ним всегда остаётся рабочая кнопка-страховка на прямую ссылку оплаты,
-// так что покупка не блокируется в любом случае.
+// Раньше здесь пытались вживую отрисовать официальный виджет Digiseller —
+// их скрипт store2/digiseller-api.js.asp сам подставлял фото и название
+// товара (data-img/data-name) поверх нашей тёмной страницы. Отказались
+// от этого: во-первых, виджет тянул на страницу оплаты чужую картинку и
+// подпись, которых там быть не должно; во-вторых, их скрипт не переживает
+// повторную инициализацию при 2-3-м открытии модалки за сессию — после
+// этого живой предпросмотр переставал рисоваться вовсе. Теперь модалка —
+// целиком наша, без внешних скриптов и виджетов: свой значок, своё
+// название и одна кнопка на прямую ссылку оплаты. Работает стабильно и
+// остаётся тёмной ровно до момента перехода на саму страницу Digiseller
+// (её оформление — уже вне нашего контроля, см. пояснение в чате).
 const pmOverlay = document.getElementById('pmOverlay');
 const pmModal = document.getElementById('pmModal');
-let pmWidgetCheckTimer = null;
-
-function digisellerIdFromUrl(url) {
-    try { return new URL(url).searchParams.get('id_d'); } catch { return null; }
-}
 
 function closeProductModal() {
     pmOverlay.classList.remove('is-open');
     document.body.style.overflow = '';
-    clearTimeout(pmWidgetCheckTimer);
-}
-
-function tryRenderDigisellerWidget() {
-    const oldJs = document.getElementById('digiseller-js');
-    if (oldJs) oldJs.remove();
-    if (!document.getElementById('digiseller-css')) {
-        const css = document.createElement('link');
-        css.rel = 'stylesheet'; css.id = 'digiseller-css';
-        css.href = '//shop.digiseller.com/xml/store2_css.asp?seller_id=1108558';
-        document.head.appendChild(css);
-    }
-    const js = document.createElement('script');
-    js.id = 'digiseller-js'; js.async = true;
-    // "_" — просто чтобы браузер не отдал старый выполненный скрипт из bfcache
-    js.src = '//digiseller.com/store2/digiseller-api.js.asp?seller_id=1108558&lang=ru-RU&_=' + Date.now();
-    document.head.appendChild(js);
-
-    clearTimeout(pmWidgetCheckTimer);
-    const start = Date.now();
-    const check = () => {
-        const wrap = document.getElementById('pmWidgetWrap');
-        if (!wrap) return; // модалку уже закрыли
-        const widgetEl = wrap.querySelector('.digiseller-buy-standalone');
-        const rendered = widgetEl && widgetEl.children.length > 0;
-        if (rendered) {
-            widgetEl.style.display = '';
-            const loading = wrap.querySelector('.pm-widget-loading');
-            if (loading) loading.remove();
-            return;
-        }
-        if (Date.now() - start > 4000) {
-            const loading = wrap.querySelector('.pm-widget-loading');
-            if (loading) loading.innerHTML = '<span>Живой предпросмотр недоступен — воспользуйтесь кнопкой ниже</span>';
-            return;
-        }
-        pmWidgetCheckTimer = setTimeout(check, 300);
-    };
-    pmWidgetCheckTimer = setTimeout(check, 300);
 }
 
 function openProductModal(item) {
-    const digisellerId = digisellerIdFromUrl(item.url);
     const payUrl = buildAffiliateUrl(item.url);
 
     pmModal.innerHTML = `
@@ -1471,10 +1412,6 @@ function openProductModal(item) {
                 <div class="pm-sub">${item.meta || ''}</div>
             </div>
             <button type="button" class="pm-close" id="pmClose" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-        </div>
-        <div class="pm-widget-wrap" id="pmWidgetWrap">
-            <div class="pm-widget-loading"><span class="pm-spin"></span><span>Загружаем карточку оплаты…</span></div>
-            ${digisellerId ? `<div class="digiseller-buy-standalone" data-id="${digisellerId}" data-ai="1108558" data-img="1" data-img-size="180" data-name="1" data-price="1" data-owner="1" data-no-price="0" style="display:none"></div>` : ''}
         </div>
         <a class="pm-fallback" id="pmFallback" href="${payUrl}" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
@@ -1488,8 +1425,6 @@ function openProductModal(item) {
 
     pmOverlay.classList.add('is-open');
     document.body.style.overflow = 'hidden';
-
-    if (digisellerId) tryRenderDigisellerWidget();
 }
 
 pmOverlay.addEventListener('click', (e) => { if (e.target === pmOverlay) closeProductModal(); });
