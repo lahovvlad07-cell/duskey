@@ -13,11 +13,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
-<!-- Telegram Web App SDK — нужен, чтобы открывать внешние ссылки (оплату)
-     через Telegram.WebApp.openLink() вместо window.open(). Внутри Mini App
-     обычный window.open ведёт себя непредсказуемо: вместо внешнего браузера
-     может подменить содержимое самого мини-приложения чужой страницей —
-     это и был тот самый "белый экран, из которого не выйти". Скрипт грузим
+<!-- Telegram Web App SDK — используется только для tg.ready()/tg.expand()
+     (нормальный полноэкранный вид мини-аппа при запуске из Телеграма).
+     Для открытия внешних ссылок (оплата) используется обычный window.open —
+     tg.openLink() пробовали, но он либо ничего не открывал, либо уводил
+     на пустую страницу Телеграма, поэтому от него отказались. Скрипт грузим
      и здесь, если открыто не в Telegram (обычный браузер) — просто не
      инициализируется, ни на что не влияет. -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -1371,8 +1371,14 @@ function buildAffiliateUrl(baseUrl) {
 
 // ===== TELEGRAM WEB APP =====
 // tg — ссылка на объект SDK, если страница открыта внутри Telegram Mini
-// App; в обычном браузере (или если скрипт не догрузился) остаётся null,
-// и весь код ниже просто использует обычный window.open как раньше.
+// App; в обычном браузере (или если скрипт не догрузился) остаётся null.
+// Используем его только для tg.ready()/tg.expand() (нормальный полноэкранный
+// вид мини-аппа) — это безобидно и с открытием ссылок никак не связано.
+//
+// Открытие внешних ссылок оплаты — ЧЕРЕЗ tg.openLink() пробовали, но на
+// практике оно либо ничего не открывало, либо уводило на пустую страницу
+// Телеграма вместо страницы оплаты. Поэтому вернули обычный window.open,
+// как было до этого — он и раньше стабильно работал.
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 if (tg) {
     tg.ready();
@@ -1380,18 +1386,10 @@ if (tg) {
 }
 
 // единая точка выхода на внешнюю площадку — открывает ссылку на оплату
-// через Telegram.WebApp.openLink() внутри Mini App (это официальный способ
-// открыть внешний URL: сам решает, вывести во внешний браузер или в
-// системное окно Telegram, и не подменяет содержимое самого мини-аппа),
-// а вне Telegram — обычным window.open, как и раньше.
 function openExternalPurchase(url) {
     const target = buildAffiliateUrl(url);
     markPurchaseOpened();
-    if (tg && typeof tg.openLink === 'function') {
-        tg.openLink(target, { try_instant_view: false });
-    } else {
-        window.open(target, '_blank', 'noopener');
-    }
+    window.open(target, '_blank', 'noopener');
 }
 
 // ---- возврат со страницы оплаты Digiseller ----
@@ -1464,16 +1462,10 @@ function openProductModal(item) {
     `;
 
     document.getElementById('pmClose').addEventListener('click', closeProductModal);
-    // внутри Telegram перехватываем клик и уводим через tg.openLink() вместо
-    // обычного перехода по href (тот самый "белый экран без выхода");
-    // href остаётся на месте как рабочий фолбэк вне Telegram и для
-    // долгого нажатия/копирования ссылки
-    document.getElementById('pmFallback').addEventListener('click', (e) => {
+    // обычный переход по href (target="_blank") — как было до попытки
+    // завести это через tg.openLink()
+    document.getElementById('pmFallback').addEventListener('click', () => {
         markPurchaseOpened();
-        if (tg && typeof tg.openLink === 'function') {
-            e.preventDefault();
-            tg.openLink(payUrl, { try_instant_view: false });
-        }
     });
 
     pmOverlay.classList.add('is-open');
