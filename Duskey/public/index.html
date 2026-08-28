@@ -348,6 +348,13 @@ mark {
   100% { box-shadow: var(--shadow), 0 0 0 0 transparent; }
 }
 .qb-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+/* на планшете/десктопе даём каталогу ниже занять всю ширину контейнера
+   (см. .catalog-grid), а сам виджет быстрой покупки — компактная форма,
+   ей незачем растягиваться на всю ширину монитора, поэтому ограничиваем
+   и центрируем начиная с той же точки, где раскрывается каталог */
+@media (min-width: 720px) {
+  .quickbuy-card { max-width: 640px; margin: 0 auto; }
+}
 
 /* "умный" блок над каталогом: поиск понял (точно или по нечёткому
    совпадению — опечатки вроде "телграм звды"), что искомое живёт в блоке
@@ -485,9 +492,12 @@ mark {
 .qb-status.is-ok { color: var(--ink-soft); }
 
 .catalog-section { padding: 18px 0 56px; }
-/* каталог теперь — ровно 2 карточки-ярлыка (Steam / Stars), поэтому сетка
-   не резиновая на много колонок, а фиксированная в 2 колонки с разумным
-   максимумом ширины — карточки не расползаются на весь десктоп */
+/* Мобильный экран: 2 узкие колонки-ярлыка — их и так только несколько,
+   разъезжаться на весь экран телефона им незачем. На планшете и десктопе
+   свободного места намного больше, так что начиная с 720px сетка
+   переходит на 3-4 колонки и использует всю ширину .container вместо
+   фиксированного узкого максимума — раньше сетка застревала на 620px
+   даже на большом мониторе, отсюда и "мобильный вид с пустыми полями". */
 .catalog-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -496,6 +506,12 @@ mark {
   margin: 0 auto;
 }
 @media (min-width: 480px) { .catalog-grid { gap: 16px; max-width: 620px; } }
+@media (min-width: 720px) {
+  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 100%; }
+}
+@media (min-width: 980px) {
+  .catalog-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+}
 
 .card {
   border-radius: var(--radius-lg);
