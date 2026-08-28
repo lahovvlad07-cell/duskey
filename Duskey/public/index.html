@@ -174,6 +174,13 @@ button { font-family: inherit; color: inherit; cursor: pointer; background: none
 
 .catalog-header h1 { font-size: clamp(1.35rem, 3vw + 0.7rem, 1.7rem); font-weight: 700; margin-bottom: 9px; line-height: 1.3; }
 .catalog-header .sub { font-size: 0.85rem; color: var(--muted); max-width: 480px; line-height: 1.55; margin-bottom: 22px; }
+/* clamp() уже даёт заголовку небольшой рост от vw, но на широком экране
+   этого мало рядом с укрупнённым trust-row (см. ниже) — на десктопе явно
+   поднимаем оба размера, чтобы шапка не терялась на фоне остального. */
+@media (min-width: 900px) {
+  .catalog-header h1 { font-size: 2.1rem; }
+  .catalog-header .sub { font-size: 0.95rem; max-width: 560px; }
+}
 
 /* the hero reveals in a short, deliberate sequence on load — brand, then
    heading, then copy, then search — rather than popping in all at once */
@@ -354,6 +361,26 @@ mark {
    и центрируем начиная с той же точки, где раскрывается каталог */
 @media (min-width: 720px) {
   .quickbuy-card { max-width: 640px; margin: 0 auto; }
+}
+/* От 900px виджет уже достаточно широкий, чтобы вертикальный стек полей
+   выглядел растянутым и "мобильным" — переключаем .qb-body на двухколоночную
+   сетку (сумма слева, логин+кнопка справа), карточку при этом слегка
+   расширяем, чтобы обеим колонкам хватало места. HTML-порядок элементов не
+   меняется — раскладка целиком на именованных grid-областях. */
+@media (min-width: 900px) {
+  .quickbuy-card { max-width: 760px; }
+  .qb-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+    row-gap: 12px;
+  }
+  .qb-tabs { grid-column: 1 / 3; grid-row: 1; }
+  .qb-amounts { grid-column: 1; grid-row: 2; align-self: start; }
+  #qbAmountRow { grid-column: 1; grid-row: 3; align-self: start; }
+  .qb-row { grid-column: 2; grid-row: 2; align-self: start; }
+  #qbBuy { grid-column: 2; grid-row: 3; align-self: stretch; }
+  .qb-status { grid-column: 1 / 3; grid-row: 4; }
 }
 
 /* "умный" блок над каталогом: поиск понял (точно или по нечёткому
@@ -651,6 +678,23 @@ mark {
 .trust-item b { font-size: 0.75rem; font-weight: 700; color: var(--ink); line-height: 1.2; }
 .trust-item span { font-size: 0.63rem; color: var(--muted); line-height: 1.35; }
 @media (max-width: 360px) { .trust-item span { display: none; } }
+/* на телефоне карточки узкие и вертикальные (иконка над текстом) — это
+   ок. На десктопе тот же вертикальный стек, растянутый на треть широкого
+   экрана, смотрится пусто (крошечная иконка посреди большой плашки).
+   Разворачиваем в горизонтальный ряд: иконка слева, текст справа,
+   всё крупнее — карточка использует свою ширину, а не просто занимает
+   место. */
+@media (min-width: 900px) {
+  .trust-row { gap: 14px; margin-top: 20px; }
+  .trust-item {
+    flex-direction: row; align-items: center; gap: 12px;
+    padding: 16px 18px;
+  }
+  .trust-item .ic { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; }
+  .trust-item .ic svg { width: 19px; height: 19px; }
+  .trust-item b { font-size: 0.88rem; }
+  .trust-item span { display: block; font-size: 0.74rem; }
+}
 
 /* ---------- Footer — one slim row, no big cards/descriptions ---------- */
 .catalog-footer { border-top: 1px solid var(--line); padding: 14px 0; margin-top: 12px; }
@@ -685,38 +729,6 @@ mark {
 }
 .to-top:hover { color: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
 .to-top svg { width: 13px; height: 13px; }
-
-/* ---------- «Вернуться в бота» — всплывает после клика на карточку,
-   ведущую на оплату через Digiseller. Мы не можем
-   заставить их страницу оплаты редиректнуть обратно в бота — это
-   настройка на стороне продавца/площадки — поэтому даём свой способ
-   вернуться, не завязанный на чужой сервер ---------- */
-.return-toast {
-  position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 40;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 12px 14px; border-radius: var(--radius-lg);
-  background: var(--surface); border: 1px solid var(--line-strong);
-  box-shadow: 0 12px 30px -10px rgba(0,0,0,0.45);
-  max-width: 440px; margin: 0 auto;
-  transform: translateY(140%); opacity: 0;
-  transition: transform 0.28s var(--ease), opacity 0.28s var(--ease);
-  pointer-events: none;
-}
-.return-toast.is-visible { transform: translateY(0); opacity: 1; pointer-events: auto; }
-.return-toast-text { flex: 1 1 200px; font-size: 0.76rem; color: var(--ink-soft); line-height: 1.4; }
-.return-toast-btn {
-  flex: 0 0 auto; padding: 8px 14px; border-radius: var(--radius-pill);
-  background: var(--accent); color: #fff; font-weight: 700; font-size: 0.78rem;
-  text-decoration: none; white-space: nowrap;
-  transition: background 0.15s var(--ease), transform 0.15s var(--ease);
-}
-.return-toast-btn:hover { background: var(--accent-deep); transform: translateY(-1px); }
-.return-toast-close {
-  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--muted); font-size: 1rem; line-height: 1;
-}
-.return-toast-close:hover { color: var(--ink); }
 
 /* ---------- Legal docs: rendered in-page as an overlay, not separate
    files — same palette, same theme toggle, no extra page load ---------- */
@@ -988,14 +1000,6 @@ mark {
         <div class="catalog-grid" id="catalogGrid"></div>
     </div>
 </section>
-
-<!-- всплывает после перехода на оплату через Digiseller —
-     см. openExternalPurchase() в скрипте ниже -->
-<div class="return-toast" id="returnToast" role="status" aria-live="polite">
-    <span class="return-toast-text">Оплата открылась в новом окне. После оплаты (или если передумали) можно вернуться сюда же.</span>
-    <a class="return-toast-btn" id="returnToastBtn" href="#" target="_blank" rel="noopener">Вернуться в бота</a>
-    <button type="button" class="return-toast-close" id="returnToastClose" aria-label="Закрыть">×</button>
-</div>
 
 <!-- карточка товара с внешней площадки, содержимое собирает openProductModal() -->
 <div class="pm-overlay" id="pmOverlay">
@@ -1365,39 +1369,6 @@ function buildAffiliateUrl(baseUrl) {
     } catch { return baseUrl; }
 }
 
-// ===== ССЫЛКА НА TELEGRAM-БОТА =====
-// Куда ведёт кнопка «Вернуться в бота» во всплывающей плашке после
-// перехода на оплату через Digiseller. Мы не можем заставить
-// их страницу оплаты редиректнуть обратно в бота — этот редирект
-// настраивается продавцом на стороне самой площадки, а не по ссылке —
-// поэтому даём свой способ вернуться, полностью на нашей стороне.
-const TELEGRAM_BOT_URL = 'https://t.me/Duskey_Bot';
-
-const returnToast = document.getElementById('returnToast');
-const returnToastBtn = document.getElementById('returnToastBtn');
-const returnToastClose = document.getElementById('returnToastClose');
-let returnToastTimer = null;
-
-if (TELEGRAM_BOT_URL && TELEGRAM_BOT_URL !== 'https://t.me/ВАШ_БОТ') {
-    returnToastBtn.href = TELEGRAM_BOT_URL;
-} else {
-    // ссылка ещё не настроена — не подсовываем пользователю мёртвую кнопку
-    returnToastBtn.href = '#';
-    returnToastBtn.setAttribute('aria-disabled', 'true');
-    returnToastBtn.style.opacity = '0.5';
-    returnToastBtn.style.pointerEvents = 'none';
-}
-
-function showReturnToast() {
-    returnToast.classList.add('is-visible');
-    clearTimeout(returnToastTimer);
-    returnToastTimer = setTimeout(() => returnToast.classList.remove('is-visible'), 14000);
-}
-returnToastClose.addEventListener('click', () => {
-    clearTimeout(returnToastTimer);
-    returnToast.classList.remove('is-visible');
-});
-
 // ===== TELEGRAM WEB APP =====
 // tg — ссылка на объект SDK, если страница открыта внутри Telegram Mini
 // App; в обычном браузере (или если скрипт не догрузился) остаётся null,
@@ -1412,8 +1383,7 @@ if (tg) {
 // через Telegram.WebApp.openLink() внутри Mini App (это официальный способ
 // открыть внешний URL: сам решает, вывести во внешний браузер или в
 // системное окно Telegram, и не подменяет содержимое самого мини-аппа),
-// а вне Telegram — обычным window.open, как и раньше. Плашку с быстрым
-// возвратом в бота показываем в обоих случаях.
+// а вне Telegram — обычным window.open, как и раньше.
 function openExternalPurchase(url) {
     const target = buildAffiliateUrl(url);
     if (tg && typeof tg.openLink === 'function') {
@@ -1421,7 +1391,6 @@ function openExternalPurchase(url) {
     } else {
         window.open(target, '_blank', 'noopener');
     }
-    showReturnToast();
 }
 
 // ===== КАРТОЧКА ТОВАРА ПАРТНЁРА (модалка) =====
@@ -1473,7 +1442,6 @@ function openProductModal(item) {
             e.preventDefault();
             tg.openLink(payUrl, { try_instant_view: false });
         }
-        showReturnToast();
     });
 
     pmOverlay.classList.add('is-open');
