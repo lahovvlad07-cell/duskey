@@ -13,10 +13,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
-<!-- Telegram Web App SDK — используется только для tg.ready()/tg.expand()
-     (нормальный полноэкранный вид мини-аппа при запуске из Телеграма).
-     Переход на оплату — обычная навигация в текущей вкладке (см. ниже,
-     openExternalPurchase), никакого window.open и никакого tg.openLink().
+<!-- Telegram Web App SDK — нужен для tg.ready()/tg.expand() (полноэкранный
+     вид мини-аппа) и для openLink() при переходе на оплату (см.
+     openExternalPurchase ниже — там же вся история решений и почему
+     обычная навигация внутри мини-аппа на чужой домен невозможна).
      Скрипт грузим и здесь, если открыто не в Telegram (обычный
      браузер) — просто не инициализируется, ни на что не влияет. -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -520,25 +520,38 @@ mark {
 .qb-status.is-ok { color: var(--ink-soft); }
 
 .catalog-section { padding: 18px 0 56px; }
-/* Мобильный экран: 2 узкие колонки-ярлыка — их и так только несколько,
-   разъезжаться на весь экран телефона им незачем. На планшете и десктопе
-   свободного места намного больше, так что начиная с 720px сетка
-   переходит на 3-4 колонки и использует всю ширину .container вместо
-   фиксированного узкого максимума — раньше сетка застревала на 620px
-   даже на большом мониторе, отсюда и "мобильный вид с пустыми полями". */
+/* ---------- Сетка каталога ----------
+   Раньше была display:grid с колонками 1fr — при 7 товарах и 4 колонках
+   последняя строка (3 карточки) прижималась влево, оставляя пустой
+   "дыркой" всю четвёртую колонку — от этого сетка и выглядела "как
+   попало". Grid растягивает колонки на всю ширину контейнера независимо
+   от того, сколько элементов в последней строке — сам по себе он не
+   умеет центрировать "хвост". Flex так умеет: карточки получают
+   фиксированную ширину (а не резиновую 1fr), а сам ряд можно выровнять
+   по центру — тогда неполная последняя строка сама встаёт по центру,
+   как в любом опрятном каталоге. Мобильный экран: 2 узкие колонки —
+   их и так только несколько, разъезжаться на весь экран телефона им
+   незачем. На планшете/десктопе сетка использует всю ширину .container
+   вместо фиксированного узкого максимума. ---------- */
 .catalog-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex; flex-wrap: wrap; justify-content: center;
   gap: 12px;
   max-width: 560px;
   margin: 0 auto;
 }
-@media (min-width: 480px) { .catalog-grid { gap: 16px; max-width: 620px; } }
+.catalog-grid > .card { flex: 0 0 calc((100% - 12px) / 2); max-width: calc((100% - 12px) / 2); }
+.catalog-grid > .catalog-empty { flex: 1 1 100%; }
+@media (min-width: 480px) {
+  .catalog-grid { gap: 16px; max-width: 620px; }
+  .catalog-grid > .card { flex-basis: calc((100% - 16px) / 2); max-width: calc((100% - 16px) / 2); }
+}
 @media (min-width: 720px) {
-  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 100%; }
+  .catalog-grid { max-width: 100%; }
+  .catalog-grid > .card { flex-basis: calc((100% - 32px) / 3); max-width: calc((100% - 32px) / 3); }
 }
 @media (min-width: 980px) {
-  .catalog-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+  .catalog-grid { gap: 20px; }
+  .catalog-grid > .card { flex-basis: calc((100% - 60px) / 4); max-width: calc((100% - 60px) / 4); }
 }
 
 .card {
@@ -1263,6 +1276,28 @@ mark {
 </template>
 
 <script>
+// ---- страница-мост для оплаты внутри Telegram ----
+// Мини-апп открыт в песочнице своего домена и не может сам перейти на
+// digiseller.me (см. историю ниже, у openExternalPurchase). Обходной путь:
+// tg.openLink() уводит не сразу на Digiseller, а на этот же сайт с
+// параметром ?goto=<ссылка на оплату>. Открывается это уже НЕ как мини-апп,
+// а как обычная веб-страница в системном/встроенном браузере Telegram — то
+// есть без песочницы. А раз это обычная страница — она вправе сама сделать
+// обычный редирект (location.replace) на Digiseller, ровно как это уже
+// работает у посетителей сайта из обычного браузера. Проверяем, что домен
+// назначения — именно Digiseller, чтобы эту страницу нельзя было превратить
+// в открытый редирект на произвольный чужой сайт.
+(function bridgeToPayment() {
+    const gotoParam = new URLSearchParams(window.location.search).get('goto');
+    if (!gotoParam) return;
+    try {
+        const dest = new URL(gotoParam);
+        const allowedHosts = ['digiseller.me', 'digiseller.ru', 'www.digiseller.ru', 'pay.digiseller.ru'];
+        const isAllowed = dest.protocol === 'https:' && allowedHosts.some((h) => dest.hostname === h || dest.hostname.endsWith('.' + h));
+        if (isAllowed) window.location.replace(dest.toString());
+    } catch { /* некорректный/отсутствующий параметр — просто открываем сайт как обычно */ }
+})();
+
 // Единый набор линейных SVG-иконок вместо эмодзи — один stroke-width,
 // одна визуальная система везде (карточки, виджет быстрой покупки).
 const ICONS = {
@@ -1418,24 +1453,8 @@ function buildAffiliateUrl(baseUrl) {
 // ===== TELEGRAM WEB APP =====
 // tg — ссылка на объект SDK, если страница открыта внутри Telegram Mini
 // App; в обычном браузере (или если скрипт не догрузился) остаётся null.
-//
-// История с открытием ссылки оплаты (коротко, чтобы не наступать на те
-// же грабли повторно):
-//  1) window.open('_blank') — глючил внутри embedded WebView;
-//  2) tg.openLink() — тогда пробовали ДО того, как мини-апп стал
-//     по-настоящему запускаться через кнопку бота, поэтому tg был
-//     "заглушкой", а не настоящей сессией — оттого и не работало;
-//  3) window.location.href (обычная навигация в текущей вкладке) — вот
-//     это уже и оказалось настоящей причиной "digiseller.me не позволяет
-//     установить соединение": WebView мини-аппа в Telegram сам не даёт
-//     перейти на чужой домен через смену location — это его штатное
-//     ограничение (песочница на свой домен), а не баг оплаты.
-// Итог: внутри Telegram переход должен идти именно через
-// tg.openLink() — это официальный, документированный Telegram способ
-// открыть внешнюю ссылку из мини-аппа (на Android — во встроенном
-// браузере Telegram, на iOS — во внешнем). Обычный window.location.href
-// остаётся только как запасной вариант вне Telegram, где он и раньше
-// стабильно работал.
+// Подробная история решений по переходу на оплату — у openExternalPurchase
+// ниже, рядом с самой функцией.
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 if (tg) {
     tg.ready();
@@ -1448,16 +1467,37 @@ if (tg) {
     if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
 }
 
-// единая точка выхода на оплату Digiseller. Куда именно вернётся
-// покупатель после оплаты/отмены — решает не этот код, а поле "страница
-// возврата после оплаты" в личном кабинете Digiseller/Plati.Market
-// (my.digiseller.com), у каждого товара или у агентского профиля
-// (ai=1108558) — туда стоит вписать https://t.me/Duskey_Bot. Это
-// единственное место, которое реально на это влияет.
+// единая точка выхода на оплату Digiseller.
+//
+// История с открытием ссылки оплаты (коротко, чтобы не наступать на те
+// же грабли повторно):
+//  1) window.open('_blank') — глючил внутри embedded WebView;
+//  2) tg.openLink() на саму ссылку Digiseller напрямую — работает, но
+//     всегда открывает отдельный экран (встроенный или системный браузер) —
+//     это не баг, так у Telegram устроена песочница, обойти нельзя;
+//  3) window.location.href прямо на Digiseller — вот это и было
+//     причиной "digiseller.me не позволяет установить соединение":
+//     WebView мини-аппа сам не даёт перейти на чужой домен через смену
+//     location — штатное ограничение песочницы, не баг оплаты.
+// Текущее решение: внутри Telegram tg.openLink() ведёт не сразу на
+// Digiseller, а на страницу-мост того же сайта (см. bridgeToPayment
+// выше) — так сама Digiseller-ссылка открывается уже "с сайта" в
+// обычном браузерном контексте, а не из песочницы мини-аппа. Экран
+// оплаты Telegram всё равно покажет отдельно от мини-аппа (это
+// неизбежно на уровне платформы), но сам переход на Digiseller
+// происходит так же надёжно, как и у обычных посетителей сайта.
+//
+// Куда именно вернётся покупатель после оплаты/отмены — решает не этот
+// код, а поле "страница возврата после оплаты" в личном кабинете
+// Digiseller/Plati.Market (my.digiseller.com), у каждого товара или у
+// агентского профиля (ai=1108558). Это единственное место, которое
+// реально на это влияет.
 function openExternalPurchase(url) {
     const target = buildAffiliateUrl(url);
     if (tg && typeof tg.openLink === 'function') {
-        tg.openLink(target);
+        const bridge = new URL(window.location.origin + window.location.pathname);
+        bridge.searchParams.set('goto', target);
+        tg.openLink(bridge.toString());
     } else {
         window.location.href = target;
     }
