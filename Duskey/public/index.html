@@ -733,24 +733,33 @@ mark {
 .to-top svg { width: 13px; height: 13px; }
 
 /* ---------- Legal docs: rendered in-page as an overlay, not separate
-   files — same palette, same theme toggle, no extra page load ---------- */
+   files — same palette, same theme toggle, no extra page load ----------
+   Раньше тут скроллиться мог то весь .legal-overlay, то .legal-modal-body
+   (в зависимости от брейкпоинта) — на мобильном модалка растягивалась
+   ровно на 100% высоты экрана через flex + align-items:stretch, а
+   overflow:hidden у .legal-modal при этом обрезал всё, что не влезло —
+   так текст документа физически невозможно было долистать не то что
+   колесом мыши, а вообще никак. Теперь схема одна и предсказуемая на
+   любом экране: у модалки есть жёсткий потолок высоты, шапка и вкладки
+   внутри неё не резиновые (flex: 0 0 auto), а прокручивается только тело
+   документа — .legal-modal-body с min-height: 0 (без этого flex-элемент
+   отказывается сжиматься и не даёт overflow-y вообще ничего прокручивать
+   — старая классическая засада именно на этом месте). ---------- */
 .legal-overlay {
   position: fixed; inset: 0; z-index: 50;
   background: rgba(4, 5, 14, 0.6);
-  backdrop-filter: blur(0px);
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: 40px 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity 0.25s var(--ease), backdrop-filter 0.25s var(--ease);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 .legal-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; backdrop-filter: blur(3px); }
 .legal-modal {
-  width: 100%; max-width: 680px;
+  width: 100%; max-width: 680px; max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg); box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow: hidden; /* обрезает только квадратные углы шапки под общий радиус — контент больше сюда не попадает, он весь в .legal-modal-body ниже */
   opacity: 0; transform: translateY(14px) scale(0.97);
   transition: transform 0.3s var(--ease), opacity 0.25s var(--ease);
 }
@@ -758,7 +767,7 @@ mark {
 .legal-modal-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 14px 16px 14px 18px; border-bottom: 1px solid var(--line);
-  position: sticky; top: 0; background: var(--surface); z-index: 2;
+  flex: 0 0 auto;
 }
 .legal-modal-head .brand-mini { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.92rem; }
 .legal-modal-head .brand-mini .mark {
@@ -778,8 +787,8 @@ mark {
    shown without closing/reopening the overlay */
 .legal-tabs {
   display: flex; gap: 20px; padding: 0 22px; overflow-x: auto;
-  border-bottom: 1px solid var(--line); position: sticky; top: 57px; background: var(--surface); z-index: 2;
-  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none; flex: 0 0 auto;
 }
 .legal-tabs::-webkit-scrollbar { display: none; }
 .legal-tab {
@@ -793,7 +802,11 @@ mark {
   content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px;
   background: linear-gradient(90deg, var(--accent), var(--coral));
 }
-.legal-modal-body { padding: 20px 22px 30px; max-height: 66vh; overflow-y: auto; }
+.legal-modal-body {
+  flex: 1 1 auto; min-height: 0; /* ключевая строка — без неё flex-элемент не сжимается и overflow-y:auto ничего не прокручивает */
+  padding: 20px 22px 30px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
 .legal-doc { animation: riseIn 0.25s var(--ease) both; }
 .legal-doc h1 { font-size: 1.28rem; margin: 0 0 6px; }
 .legal-doc .meta { font-size: 0.76rem; color: var(--muted); margin-bottom: 6px; }
@@ -815,9 +828,8 @@ mark {
 .legal-doc .req b { color: var(--ink); }
 .legal-doc .doc-link { color: var(--accent); font-weight: 600; cursor: pointer; background: none; border: none; padding: 0; font: inherit; text-decoration: underline; }
 @media (max-width: 480px) {
-  .legal-overlay { padding: 0; align-items: stretch; }
-  .legal-modal { max-width: none; min-height: 100%; border-radius: 0; border: none; }
-  .legal-modal-body { max-height: none; }
+  .legal-overlay { padding: 0; }
+  .legal-modal { max-width: none; max-height: 100vh; height: 100%; border-radius: 0; border: none; }
 }
 
 /* ---------- Экран подтверждения перед оплатой — открывается по клику
@@ -1406,16 +1418,24 @@ function buildAffiliateUrl(baseUrl) {
 // ===== TELEGRAM WEB APP =====
 // tg — ссылка на объект SDK, если страница открыта внутри Telegram Mini
 // App; в обычном браузере (или если скрипт не догрузился) остаётся null.
-// Используем его только для tg.ready()/tg.expand() (нормальный полноэкранный
-// вид мини-аппа) — это безобидно и с открытием ссылок никак не связано.
 //
-// Открытие внешних ссылок оплаты — ЧЕРЕЗ tg.openLink() пробовали, но на
-// практике оно либо ничего не открывало, либо уводило на пустую страницу
-// Телеграма вместо страницы оплаты. Обычный window.open('_blank') тоже
-// вёл себя не всегда предсказуемо внутри embedded WebView. Остановились
-// на самом простом варианте — обычной навигации в текущей вкладке
-// (window.location.href, см. openExternalPurchase ниже): без новой
-// вкладки, без сторонних API, с нормальным Referer из коробки.
+// История с открытием ссылки оплаты (коротко, чтобы не наступать на те
+// же грабли повторно):
+//  1) window.open('_blank') — глючил внутри embedded WebView;
+//  2) tg.openLink() — тогда пробовали ДО того, как мини-апп стал
+//     по-настоящему запускаться через кнопку бота, поэтому tg был
+//     "заглушкой", а не настоящей сессией — оттого и не работало;
+//  3) window.location.href (обычная навигация в текущей вкладке) — вот
+//     это уже и оказалось настоящей причиной "digiseller.me не позволяет
+//     установить соединение": WebView мини-аппа в Telegram сам не даёт
+//     перейти на чужой домен через смену location — это его штатное
+//     ограничение (песочница на свой домен), а не баг оплаты.
+// Итог: внутри Telegram переход должен идти именно через
+// tg.openLink() — это официальный, документированный Telegram способ
+// открыть внешнюю ссылку из мини-аппа (на Android — во встроенном
+// браузере Telegram, на iOS — во внешнем). Обычный window.location.href
+// остаётся только как запасной вариант вне Telegram, где он и раньше
+// стабильно работал.
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 if (tg) {
     tg.ready();
@@ -1428,25 +1448,19 @@ if (tg) {
     if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
 }
 
-// единая точка выхода на оплату Digiseller — переходим в текущей же
-// вкладке (без window.open/новой вкладки). Так надёжнее всего работает
-// и в обычном браузере, и внутри Telegram Mini App (открытие новых
-// вкладок из embedded WebView — источник самых частых глюков), и, что
-// важно, браузер при обычном переходе по умолчанию отправляет заголовок
-// Referer — Digiseller видит, с какого сайта пришёл человек. Мы этот
-// заголовок нигде не блокируем и не подменяем (в проекте нет ни meta
-// name="referrer", ни Referrer-Policy заголовков) — так что "убрать
-// шифрование" тут нечего: перехода в зашифрованном/анонимном виде
-// никогда и не было. Если Digiseller всё равно не показывает кнопку
-// возврата — это настраивается в личном кабинете Digiseller/Plati.Market
+// единая точка выхода на оплату Digiseller. Куда именно вернётся
+// покупатель после оплаты/отмены — решает не этот код, а поле "страница
+// возврата после оплаты" в личном кабинете Digiseller/Plati.Market
 // (my.digiseller.com), у каждого товара или у агентского профиля
-// (ai=1108558) есть поле "страница возврата после оплаты" — туда стоит
-// вписать https://t.me/Duskey_Bot, это единственное место, которое
-// реально решает, куда вернётся покупатель — со стороны кода сайта
-// повлиять на это нельзя.
+// (ai=1108558) — туда стоит вписать https://t.me/Duskey_Bot. Это
+// единственное место, которое реально на это влияет.
 function openExternalPurchase(url) {
     const target = buildAffiliateUrl(url);
-    window.location.href = target;
+    if (tg && typeof tg.openLink === 'function') {
+        tg.openLink(target);
+    } else {
+        window.location.href = target;
+    }
 }
 
 // ===== КАТАЛОГ ТОВАРОВ =====
@@ -1512,6 +1526,9 @@ const SEARCH_SYNONYMS = [
     ['youtube', 'ютуб', 'ютьюб'],
     ['steam', 'стим'],
     ['epic', 'эпик', 'epic games', 'эпик геймс'],
+    ['claude', 'клод', 'клауд'],
+    ['robux', 'робакс', 'робукс', 'робаксы', 'робуксы'],
+    ['roblox', 'роблокс', 'роблокса', 'роблоксе'],
 ];
 
 // добавляет к тексту все синонимы из групп, которые в нём нашлись —
@@ -1806,7 +1823,12 @@ function wordSimilarity(a, b) {
 // FUZZY_FLOOR: слова короче него по смыслу не считаем совпадением вообще —
 // это фильтр случайных совпадений, а не опечаток.
 const FUZZY_STRONG = 0.78;
-const FUZZY_FLOOR = 0.5;
+// поднят с 0.5: при полном каталоге (а не только 2 товарах быстрой
+// покупки) на пороге 0.5 короткие слова начали случайно пересекаться
+// (например "клод" совпадал с "вход" из описания Spotify — тоже 4
+// буквы, тоже 2 из 4 разные). 0.62 всё ещё прощает одну опечатку в
+// слове такой длины, но не две.
+const FUZZY_FLOOR = 0.62;
 const FUZZY_MIN_WORD_LEN = 3; // короткие слова (1-2 буквы) нечётко не сравниваем — слишком много случайных совпадений
 
 function bestTokenSimilarity(word, tokens) {
