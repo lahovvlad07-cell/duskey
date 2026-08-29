@@ -1495,12 +1495,26 @@ if (tg) {
 function openExternalPurchase(url) {
     const target = buildAffiliateUrl(url);
     if (tg && typeof tg.openLink === 'function') {
+        // Telegram: ведём себя как раньше — вкладка/мини-апп остаётся на
+        // месте, ничего закрывать не нужно (см. историю решений выше)
         const bridge = new URL(window.location.origin + window.location.pathname);
         bridge.searchParams.set('goto', target);
         tg.openLink(bridge.toString());
-    } else {
-        window.location.href = target;
+        return;
     }
+    // Обычный сайт (не Telegram): открываем оплату в новой вкладке и сразу
+    // закрываем текущую — в итоге у человека остаётся одна вкладка (с
+    // оплатой), а не старая вкладка сайта плюс новая с Digiseller рядом.
+    //
+    // Ограничение браузера, которое здесь не обойти: window.close() без
+    // спроса закрывает только вкладки, открытые самим скриптом. Если эта
+    // вкладка сайта была открыта обычной навигацией (закладка, ссылка без
+    // target, вручную набранный адрес) — а не через window.open — Chrome и
+    // большинство браузеров молча откажутся её закрывать. В этом случае
+    // старая вкладка просто останется открытой рядом с новой; это не
+    // баг, а сознательное ограничение безопасности браузера.
+    window.open(target, '_blank', 'noopener');
+    window.close();
 }
 
 // ===== КАТАЛОГ ТОВАРОВ =====
