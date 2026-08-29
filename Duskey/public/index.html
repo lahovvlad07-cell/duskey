@@ -1514,19 +1514,27 @@ function openExternalPurchase(url) {
 //          клик скроллит к виджету и переключает вкладку;
 //  - url → экран подтверждения (openProductConfirm, см. ниже), кнопка
 //          на нём уже ведёт на оплату (openExternalPurchase).
+// порядок внутри массива — он же порядок отображения на вкладке «Все»
+// (сетка не сортирует сама, просто рисует catalog как есть), поэтому
+// товары сгруппированы по категории: сначала пополнения, потом telegram,
+// потом подписки — а не вперемешку, как раньше (Robux, например, был
+// последней карточкой в списке, через все подписки от Steam)
 const catalog = [
+    // -- пополнения --
     { key: 'steam', icon: ICONS.wallet, name: 'Пополнение Steam', meta: 'Мгновенно, на ваш логин', priceLabel: 'от 100 ₽', category: 'topup', hit: true },
+    {
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=5933050&ai=1108558',
+        icon: ICONS.gem, name: 'Robux', meta: 'Roblox Global, 80–22500, нужен логин и пароль',
+        priceLabel: 'от 100 ₽', category: 'topup', hit: false, partner: true,
+    },
+    // -- telegram --
     { key: 'stars', icon: ICONS.star, name: 'Telegram Stars', meta: 'Для профиля и каналов', priceLabel: 'от 50 ⭐', category: 'telegram', hit: false, partner: true },
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=4677311&ai=1108558',
         icon: ICONS.crown, name: 'Telegram Premium', meta: '3 / 6 / 12 мес., без входа в аккаунт',
         priceLabel: 'от 1299 ₽', category: 'telegram', hit: true, partner: true,
     },
-    {
-        url: 'https://digiseller.me/asp2/pay.asp?id_d=3427397&ai=1108558',
-        icon: ICONS.headphones, name: 'Spotify Premium', meta: '1–12 мес., Individual / Duo / Family, нужен вход',
-        priceLabel: 'от 226 ₽', category: 'subs', hit: false, partner: true,
-    },
+    // -- подписки --
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=4023986&ai=1108558',
         icon: ICONS.chip, name: 'Claude AI Pro / Max', meta: 'Подписка 24/7, есть вариант без входа',
@@ -1538,9 +1546,9 @@ const catalog = [
         priceLabel: 'от 879 ₽', category: 'subs', hit: false, partner: true,
     },
     {
-        url: 'https://digiseller.me/asp2/pay.asp?id_d=5933050&ai=1108558',
-        icon: ICONS.gem, name: 'Robux', meta: 'Roblox Global, 80–22500, нужен логин и пароль',
-        priceLabel: 'от 100 ₽', category: 'topup', hit: false, partner: true,
+        url: 'https://digiseller.me/asp2/pay.asp?id_d=3427397&ai=1108558',
+        icon: ICONS.headphones, name: 'Spotify Premium', meta: '1–12 мес., Individual / Duo / Family, нужен вход',
+        priceLabel: 'от 226 ₽', category: 'subs', hit: false, partner: true,
     },
 ];
 
@@ -1579,6 +1587,34 @@ function expandWithSynonyms(text) {
         if (group.some((term) => text.includes(term))) extra += ' ' + group.join(' ');
     }
     return text + extra;
+}
+
+// ---- «раскладка» — самая частая причина «ничего не нашлось» на рунет-сайтах:
+// человек забыл переключить раскладку и набрал русское слово английскими
+// буквами (или наоборот). Стандартная карта соответствия клавиш ЙЦУКЕН↔QWERTY
+// симметрична, поэтому одна и та же таблица переводит текст в обе стороны —
+// просто подставляем каждый символ и его пару. Раньше это только
+// упоминалось в комментарии к поиску, а самой конвертации не было.
+const LAYOUT_MAP = {
+    'q': 'й', 'w': 'ц', 'e': 'у', 'r': 'к', 't': 'е', 'y': 'н', 'u': 'г', 'i': 'ш', 'o': 'щ', 'p': 'з', '[': 'х', ']': 'ъ',
+    'a': 'ф', 's': 'ы', 'd': 'в', 'f': 'а', 'g': 'п', 'h': 'р', 'j': 'о', 'k': 'л', 'l': 'д', ';': 'ж', "'": 'э',
+    'z': 'я', 'x': 'ч', 'c': 'с', 'v': 'м', 'b': 'и', 'n': 'т', 'm': 'ь', ',': 'б', '.': 'ю',
+};
+// обратная карта (рус → лат) строится автоматически из прямой — так они
+// гарантированно не расходятся при правках
+const LAYOUT_MAP_REV = Object.fromEntries(Object.entries(LAYOUT_MAP).map(([en, ru]) => [ru, en]));
+
+function switchLayout(text) {
+    let out = '';
+    for (const ch of text) out += LAYOUT_MAP[ch] || LAYOUT_MAP_REV[ch] || ch;
+    return out;
+}
+
+// true, если слово похоже на «не ту раскладку» — то есть перевод в другую
+// раскладку реально что-то поменял (не просто цифры/пробелы прошли насквозь)
+function looksLikeWrongLayout(word) {
+    const switched = switchLayout(word);
+    return switched !== word && /[a-zа-яё]/i.test(word);
 }
 
 // поисковый профиль товара считается один раз и переиспользуется —
@@ -1734,11 +1770,17 @@ function renderCatalog() {
     // ниже — bestTokenSimilarity/FUZZY_FLOOR), поэтому теперь и "спотифай"
     // с опечаткой, и "клод" вместо "claude" находят нужную карточку
     if (words.length) {
-        items = items.filter((i) => words.every((w) => {
-            if (i._search.includes(w)) return true;
-            if (w.length < FUZZY_MIN_WORD_LEN) return false;
-            return bestTokenSimilarity(w, i._tokens) >= FUZZY_FLOOR;
-        }));
+        // для каждого слова запроса заодно пробуем версию в другой
+        // раскладке — если реальное слово не совпало вообще, но его
+        // "неправильно набранная" версия совпадает уверенно, это тоже
+        // считаем находкой (см. switchLayout выше)
+        items = items
+            .map((i) => ({ item: i, score: wordsMatchScore(words, i._search, i._tokens) }))
+            .filter((r) => r.score !== null)
+            // чем точнее совпадение — тем выше в списке; при равном счёте
+            // порядок каталога (топ-товары, категории) не ломается
+            .sort((a, b) => b.score - a.score)
+            .map((r) => r.item);
     }
 
     renderSearchSuggestion(words);
@@ -1884,6 +1926,42 @@ function bestTokenSimilarity(word, tokens) {
     return best;
 }
 
+// на сколько уверенно ОДНО слово запроса опознаёт товар — 1 за точную
+// подстроку, чуть ниже за раскладку/опечатки, null если вообще мимо.
+// Пробуем слово как есть и — если оно не совпало вовсе — в другой
+// раскладке (looksLikeWrongLayout отсекает случаи, где переключать
+// нечего, например чистые цифры).
+function bestWordMatch(word, search, tokens) {
+    if (search.includes(word)) return 1;
+    const alt = looksLikeWrongLayout(word) ? switchLayout(word) : null;
+    if (alt && search.includes(alt)) return 0.95; // чуть ниже точного — это "исправленное" совпадение
+
+    if (word.length >= FUZZY_MIN_WORD_LEN) {
+        const fuzzy = bestTokenSimilarity(word, tokens);
+        if (fuzzy >= FUZZY_FLOOR) return fuzzy * 0.9;
+    }
+    if (alt && alt.length >= FUZZY_MIN_WORD_LEN) {
+        const fuzzyAlt = bestTokenSimilarity(alt, tokens);
+        if (fuzzyAlt >= FUZZY_FLOOR) return fuzzyAlt * 0.85;
+    }
+    return null;
+}
+
+// каждое слово запроса должно опознать товар хоть как-то — иначе товар
+// не попадает в выдачу вообще. Итоговый счёт — средняя уверенность по
+// всем словам, он же используется, чтобы отсортировать более точные
+// совпадения выше (см. renderCatalog)
+function wordsMatchScore(words, search, tokens) {
+    if (!words.length) return 0;
+    let sum = 0;
+    for (const w of words) {
+        const m = bestWordMatch(w, search, tokens);
+        if (m === null) return null;
+        sum += m;
+    }
+    return sum / words.length;
+}
+
 // нечёткий поиск только среди товаров быстрой покупки (Steam / TG Stars) —
 // их всего два, поэтому на выходе никогда не будет больше 2 карточек
 function fuzzyMatchQuickBuy(words) {
@@ -1892,7 +1970,13 @@ function fuzzyMatchQuickBuy(words) {
         const tokens = [...new Set(quickBuySearchProfiles[key].split(/\s+/).filter(Boolean))];
         const scores = words
             .filter((w) => w.length >= FUZZY_MIN_WORD_LEN)
-            .map((w) => bestTokenSimilarity(w, tokens));
+            .map((w) => {
+                const direct = bestTokenSimilarity(w, tokens);
+                if (!looksLikeWrongLayout(w)) return direct;
+                // слово могло быть набрано не в той раскладке — сравниваем
+                // и переключённую версию, берём то, что похоже увереннее
+                return Math.max(direct, bestTokenSimilarity(switchLayout(w), tokens));
+            });
 
         if (!scores.length) continue;
         // ни одно слово запроса не должно быть совсем "мимо" — иначе
@@ -1921,9 +2005,14 @@ function renderSearchSuggestion(words) {
     const box = document.getElementById('qbSuggest');
     if (!words.length || searchQuery.trim().length < MIN_SUGGEST_CHARS) { box.hidden = true; box.innerHTML = ''; return; }
 
-    // сначала точное совпадение слов — быстрее и надёжнее
+    // сначала точное совпадение слов (как есть или в другой раскладке) —
+    // быстрее и надёжнее нечёткого сравнения
     let matches = Object.keys(quickBuySearchProfiles)
-        .filter((key) => words.every((w) => quickBuySearchProfiles[key].includes(w)))
+        .filter((key) => words.every((w) => {
+            const profile = quickBuySearchProfiles[key];
+            if (profile.includes(w)) return true;
+            return looksLikeWrongLayout(w) && profile.includes(switchLayout(w));
+        }))
         .map((key) => ({ key, score: 1 }));
 
     // ничего не нашлось буквально — пробуем нечёткое сравнение на опечатки
