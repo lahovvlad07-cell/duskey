@@ -28,6 +28,7 @@ create table if not exists tamagotchi_pets (
   food                 jsonb not null default '{}',   -- { itemId: количество } — купленная еда, тратится по 1 за кормление
   toys                 jsonb not null default '{}',   -- { itemId: количество } — купленные игрушки, тратятся по 1 за игру
   last_pet_at          timestamptz,                    -- когда последний раз погладили (кулдаун награды за поглаживание)
+  link_code            text unique,                    -- случайный идентификатор для переноса питомца на другое устройство/в Telegram (см. /pet/link в routes/tamagotchi.js) — генерируется сервером, никогда не задаётся пользователем
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );
@@ -47,5 +48,6 @@ alter table tamagotchi_pets add column if not exists equipped_furniture text;
 alter table tamagotchi_pets add column if not exists food jsonb not null default '{}';
 alter table tamagotchi_pets add column if not exists toys jsonb not null default '{}';
 alter table tamagotchi_pets add column if not exists last_pet_at timestamptz;
+alter table tamagotchi_pets add column if not exists link_code text unique;
 
 comment on table tamagotchi_pets is 'Бонусный питомец на сайте — один на owner_id (см. routes/tamagotchi.js): статы, уровень/опыт, монеты, магазин (еда/игрушки копятся стопкой, аксессуары/фоны — разово), стрик ежедневных наград.';

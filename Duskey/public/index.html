@@ -1030,6 +1030,24 @@ mark {
 .tama-recolor-btn:hover { color: var(--ink); border-color: var(--accent); }
 .tama-recolor-panel { display: flex; justify-content: center; margin: 12px 0 -2px; }
 .tama-recolor-panel[hidden] { display: none; }
+.tama-linkcode-panel {
+  margin: 10px auto -2px; max-width: 260px; text-align: center;
+  padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-alt); border: 1px solid var(--line);
+}
+.tama-linkcode-panel[hidden] { display: none; }
+.tama-linkcode-hint { font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
+.tama-linkcode-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
+.tama-linkcode-row code {
+  font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.5px;
+  color: var(--ink); background: var(--surface); padding: 4px 10px; border-radius: 8px; border: 1px dashed var(--line-strong);
+}
+.tama-link-toggle {
+  display: block; margin: 14px auto 0; font-size: 0.76rem; color: var(--muted); text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tama-link-toggle:hover { color: var(--ink-soft); }
+.tama-link-row { display: flex; gap: 8px; margin-top: 10px; }
+.tama-link-row[hidden] { display: none; }
 .tama-pet { width: 128px; height: 128px; position: relative; }
 .tama-pet-shadow {
   position: absolute; bottom: -4px; left: 50%; width: 70px; height: 12px;
@@ -3208,6 +3226,20 @@ const TamaStore = {
         if (!result.blocked) tamaSaveLocal(result.pet);
         return result;
     },
+    // привязка по идентификатору работает только через сервер — тут
+    // нечего подставлять из localStorage, весь смысл в том, чтобы
+    // забрать питомца, который может физически лежать в базе, а не на
+    // этом устройстве
+    async linkByCode(code) {
+        const res = await tamaFetch('/pet/link', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ownerId: getTamaOwnerId(), code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Не удалось привязать питомца');
+        tamaOffline = false;
+        return tamaEnsureFields(data);
+    },
 };
 
 // одна и та же логика действий используется и в офлайн-режиме на клиенте,
@@ -3498,6 +3530,11 @@ function tamaPickerHtml() {
             <input type="text" class="tama-name-input" id="tamaNameInput" placeholder="Как назовём?" maxlength="16">
             <button type="button" class="tama-confirm-btn" id="tamaConfirmBtn">Завести</button>
         </div>
+        <button type="button" class="tama-link-toggle" id="tamaLinkToggle">Уже есть питомец? Ввести идентификатор</button>
+        <div class="tama-link-row" id="tamaLinkRow" hidden>
+            <input type="text" class="tama-name-input" id="tamaLinkInput" placeholder="XXXXX-XXXXX" maxlength="12" autocapitalize="characters">
+            <button type="button" class="tama-confirm-btn" id="tamaLinkBtn">Привязать</button>
+        </div>
     `;
 }
 
@@ -3686,9 +3723,16 @@ function tamaStageHtml(pet) {
         <div class="tama-pet-name-row">
             <p class="tama-pet-name">${escapeHtml(pet.name)}</p>
             <button type="button" class="tama-recolor-btn" id="tamaRecolorBtn" aria-label="Изменить цвет" title="Изменить цвет">🎨</button>
+            <button type="button" class="tama-recolor-btn" id="tamaLinkCodeBtn" aria-label="Идентификатор питомца" title="Идентификатор питомца">🔑</button>
         </div>
         <div class="tama-recolor-panel" id="tamaRecolorPanel" hidden>
             <div class="tama-color-row">${tamaColorRowHtml(tamaColor)}</div>
+        </div>
+        <div class="tama-linkcode-panel" id="tamaLinkCodePanel" hidden>
+            ${pet.link_code
+                ? `<p class="tama-linkcode-hint">Введи этот код на другом устройстве или в боте, чтобы забрать питомца туда:</p>
+                   <div class="tama-linkcode-row"><code id="tamaLinkCodeValue">${escapeHtml(pet.link_code)}</code><button type="button" class="tama-recolor-btn" id="tamaLinkCodeCopyBtn" title="Копировать">📋</button></div>`
+                : `<p class="tama-linkcode-hint">Идентификатор появится, когда подключена база данных (сейчас питомец сохраняется только в этом браузере).</p>`}
         </div>
         <div class="tama-stats">
             <div class="tama-stat"><span class="tama-stat-icon">🍖</span><div class="tama-bar"><div class="tama-bar-fill satiety" style="width:${Math.round(100 - pet.hunger)}%"></div></div></div>
@@ -4156,6 +4200,29 @@ function renderTamagotchi() {
                 if (lead) lead.textContent = 'Не получилось завести питомца — попробуйте ещё раз.';
             }
         });
+        const linkToggle = document.getElementById('tamaLinkToggle');
+        const linkRow = document.getElementById('tamaLinkRow');
+        if (linkToggle) linkToggle.addEventListener('click', () => {
+            linkRow.hidden = !linkRow.hidden;
+            if (!linkRow.hidden) document.getElementById('tamaLinkInput').focus();
+        });
+        const linkBtn = document.getElementById('tamaLinkBtn');
+        if (linkBtn) linkBtn.addEventListener('click', async () => {
+            const input = document.getElementById('tamaLinkInput');
+            const code = input.value.trim();
+            if (!code) return;
+            linkBtn.disabled = true;
+            try {
+                tamaPet = await TamaStore.linkByCode(code);
+                tamaColor = tamaLoadColor() || tamaDefaultColor(tamaPet.species);
+                tamaSaveColor(tamaColor);
+                renderTamagotchi();
+                tamaShowToast('Питомец привязан 🎉');
+            } catch (e) {
+                linkBtn.disabled = false;
+                tamaShowToast(e.message || 'Не получилось привязать питомца');
+            }
+        });
         return;
     }
 
@@ -4223,6 +4290,21 @@ function renderTamagotchi() {
             tamaSaveColor(tamaColor);
             renderTamagotchi();
         });
+    });
+    const linkCodeBtn = document.getElementById('tamaLinkCodeBtn');
+    if (linkCodeBtn) linkCodeBtn.addEventListener('click', () => {
+        const panel = document.getElementById('tamaLinkCodePanel');
+        panel.hidden = !panel.hidden;
+    });
+    const linkCodeCopyBtn = document.getElementById('tamaLinkCodeCopyBtn');
+    if (linkCodeCopyBtn) linkCodeCopyBtn.addEventListener('click', async () => {
+        const value = document.getElementById('tamaLinkCodeValue').textContent;
+        try {
+            await navigator.clipboard.writeText(value);
+            tamaShowToast('Скопировано');
+        } catch {
+            tamaShowToast(value); // буфер обмена недоступен — хотя бы покажем код на экране подольше
+        }
     });
     const dailyBanner = document.getElementById('tamaDailyBanner');
     if (dailyBanner) dailyBanner.addEventListener('click', () => tamaDoAction('claim_daily', null));

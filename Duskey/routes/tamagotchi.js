@@ -13,9 +13,26 @@
 // меняйте в обоих файлах.
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { supabase, isConfigured } = require('../lib/supabase');
 
 const TABLE = 'tamagotchi_pets';
+
+// Идентификатор для переноса питомца на другое устройство/в Telegram
+// (см. /pet/link ниже). Генерируется ТОЛЬКО сервером — пользователь не
+// может его выбрать сам, поэтому подобрать чужой перебором за разумное
+// время нереально: 10 символов из 32-символьного алфавита (без 0/O/1/I/L,
+// чтобы не путать при ручном вводе) — это 50 бит энтропии.
+const LINK_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+function genLinkCode() {
+  const bytes = crypto.randomBytes(10);
+  let raw = '';
+  for (let i = 0; i < 10; i++) raw += LINK_CODE_ALPHABET[bytes[i] % LINK_CODE_ALPHABET.length];
+  return raw.slice(0, 5) + '-' + raw.slice(5);
+}
+function normalizeLinkCode(input) {
+  return String(input || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+}
 
 // Баланс монет — важная заметка для будущих правок (2026): аудит показал,
 // что при HAPPY_PER_MIN=1/8 и PET_COOLDOWN=24ч расход монет на поддержание
@@ -287,6 +304,7 @@ function ensureFields(pet) {
     food: pet.food || {},
     toys: pet.toys || {},
     last_pet_at: pet.last_pet_at || null,
+    link_code: pet.link_code || null,
   };
 }
 
@@ -306,7 +324,48 @@ router.get('/pet/:ownerId', async (req, res) => {
     return res.status(502).json({ ok: false, error: 'Не удалось загрузить питомца' });
   }
   if (!data) return res.status(404).json({ ok: false });
+  // старые питомцы, заведённые до появления идентификаторов, — досоздаём
+  // код при первом же обращении, чтобы у всех рано или поздно он появился
+  if (!data.link_code) {
+    try {
+      const { data: patched } = await supabase.from(TABLE).update({ link_code: genLinkCode() }).eq('owner_id', req.params.ownerId).select().single();
+      if (patched) return res.json(applyDecay(ensureFields(patched)));
+    } catch (e) { /* не критично — просто не покажем код в этот раз */ }
+  }
   res.json(applyDecay(ensureFields(data)));
+});
+
+// Привязка питомца по идентификатору (см. genLinkCode выше) — переносит
+// существующего питомца на текущее устройство/аккаунт вместо создания
+// нового. Код можно посмотреть у уже заведённого питомца (кнопка 🔑 —
+// см. public/index.html), сам его никто не выбирает и не подбирает.
+router.post('/pet/link', async (req, res) => {
+  const ownerId = String((req.body && req.body.ownerId) || '');
+  const code = normalizeLinkCode(req.body && req.body.code);
+  if (!ownerId) return res.status(400).json({ ok: false, error: 'ownerId обязателен' });
+  if (code.length < 8) return res.status(400).json({ ok: false, error: 'Некорректный идентификатор' });
+
+  const { data: found, error: findErr } = await supabase.from(TABLE).select('*').eq('link_code', code).maybeSingle();
+  if (findErr) {
+    console.error('tamagotchi link find error:', findErr);
+    return res.status(502).json({ ok: false, error: 'Не удалось найти питомца' });
+  }
+  if (!found) return res.status(404).json({ ok: false, error: 'Питомец с таким идентификатором не найден' });
+  if (found.owner_id === ownerId) return res.json(applyDecay(ensureFields(found)));
+
+  // привязка переносит питомца сюда, а не клонирует — если на этом
+  // устройстве/аккаунте уже был свой питомец, он замещается тем, что
+  // пришёл по коду (иначе тут остался бы осиротевший дубликат)
+  await supabase.from(TABLE).delete().eq('owner_id', ownerId);
+  const { data: moved, error: moveErr } = await supabase.from(TABLE)
+    .update({ owner_id: ownerId, updated_at: new Date().toISOString() })
+    .eq('link_code', code)
+    .select().single();
+  if (moveErr) {
+    console.error('tamagotchi link move error:', moveErr);
+    return res.status(502).json({ ok: false, error: 'Не удалось привязать питомца' });
+  }
+  res.json(applyDecay(ensureFields(moved)));
 });
 
 router.post('/pet/:ownerId', async (req, res) => {
@@ -314,7 +373,7 @@ router.post('/pet/:ownerId', async (req, res) => {
   if (species !== 'cat' && species !== 'dog') {
     return res.status(400).json({ ok: false, error: 'species должен быть cat или dog' });
   }
-  const row = {
+  const baseRow = {
     owner_id: req.params.ownerId,
     species,
     name: (name || (species === 'cat' ? 'Котёнок' : 'Щенок')).slice(0, 16),
@@ -337,8 +396,16 @@ router.post('/pet/:ownerId', async (req, res) => {
     updated_at: new Date().toISOString(),
   };
   // upsert — повторное «завести» с тем же owner_id просто вернёт того же
-  // питомца, а не упадёт на дубликате primary key
-  const { data, error } = await supabase.from(TABLE).upsert(row, { onConflict: 'owner_id' }).select().single();
+  // питомца, а не упадёт на дубликате primary key. link_code почти
+  // никогда не совпадёт (50 бит энтропии), но на всякий случай пробуем
+  // перегенерировать и повторить пару раз, а не падать с 502
+  let data, error;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    ({ data, error } = await supabase.from(TABLE)
+      .upsert({ ...baseRow, link_code: genLinkCode() }, { onConflict: 'owner_id' })
+      .select().single());
+    if (!error || error.code !== '23505') break;
+  }
   if (error) {
     console.error('tamagotchi create error:', error);
     return res.status(502).json({ ok: false, error: 'Не удалось завести питомца' });
