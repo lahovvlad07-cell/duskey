@@ -1038,23 +1038,25 @@ mark {
 .tama-recolor-panel { display: flex; justify-content: center; margin: 12px 0 -2px; }
 .tama-recolor-panel[hidden] { display: none; }
 .tama-linkcode-panel {
-  margin: 10px auto -2px; max-width: 260px; text-align: center;
+  margin: 10px auto -2px; width: 100%; max-width: 280px; box-sizing: border-box; text-align: center;
   padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-alt); border: 1px solid var(--line);
 }
 .tama-linkcode-panel[hidden] { display: none; }
 .tama-linkcode-hint { font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
-.tama-linkcode-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
+.tama-linkcode-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .tama-linkcode-row code {
-  font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.5px;
-  color: var(--ink); background: var(--surface); padding: 4px 10px; border-radius: 8px; border: 1px dashed var(--line-strong);
+  font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.3px;
+  color: var(--ink); background: var(--surface); padding: 4px 8px; border-radius: 8px; border: 1px dashed var(--line-strong);
+  max-width: 100%; overflow-x: auto; white-space: nowrap;
 }
 .tama-link-toggle {
   display: block; margin: 14px auto 0; font-size: 0.76rem; color: var(--muted); text-decoration: underline;
   text-underline-offset: 2px;
 }
 .tama-link-toggle:hover { color: var(--ink-soft); }
-.tama-link-row { display: flex; gap: 8px; margin-top: 10px; }
+.tama-link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .tama-link-row[hidden] { display: none; }
+.tama-link-row .tama-name-input { min-width: 0; }
 .tama-pet { width: 128px; height: 128px; position: relative; }
 .tama-pet-shadow {
   position: absolute; bottom: -4px; left: 50%; width: 70px; height: 12px;
@@ -3042,24 +3044,39 @@ function applyTamaDecay(pet) {
 }
 
 // личность пользователя для привязки питомца: в Telegram — его id,
-// в обычном браузере — случайный идентификатор, который живёт в
-// localStorage (это просто анонимный id устройства, не хранилище данных
-// питомца — то теперь только в Supabase). Оборачиваем в try/catch: в
-// некоторых браузерах/режимах (например, приватный режим Safari)
-// обращение к localStorage бросает исключение — без защиты это уронило
-// бы вообще весь скрипт на этой самой первой строке. Если localStorage
-// недоступен — просто используем id только на время сессии (без
-// сохранения между визитами).
+// в обычном браузере — случайный идентификатор устройства (не данные
+// питомца — те теперь только в Supabase). Храним его и в localStorage,
+// и продублированно в cookie (1 год) — так он переживёт и приватный
+// режим, где localStorage иногда доступен только на сессию, и редкие
+// случаи, когда что-то одно из двух очищается, а другое нет. При чтении
+// сверяем оба источника: если они разошлись (например, localStorage
+// стёрли, а cookie осталась) — используем то значение, что нашлось, и
+// восстанавливаем им второе хранилище, а не генерируем id заново —
+// именно повторная генерация id и означает "пришлось вводить код заново".
+// Обёрнуто в try/catch: в некоторых браузерах/режимах обращение к
+// localStorage бросает исключение — без защиты это уронило бы весь
+// скрипт на этой самой первой строке.
+function tamaGetCookie(name) {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+}
+function tamaSetCookie(name, value) {
+    const maxAge = 60 * 60 * 24 * 365; // 1 год
+    document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; SameSite=Lax`;
+}
 function getTamaOwnerId() {
     try {
         if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
             return 'tg_' + tg.initDataUnsafe.user.id;
         }
-        let id = localStorage.getItem('duskey_pet_uid');
+        let id = null;
+        try { id = localStorage.getItem('duskey_pet_uid'); } catch { /* localStorage недоступен — попробуем cookie ниже */ }
+        if (!id) id = tamaGetCookie('duskey_pet_uid');
         if (!id) {
             id = 'web_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-            localStorage.setItem('duskey_pet_uid', id);
         }
+        try { localStorage.setItem('duskey_pet_uid', id); } catch { /* переживём без localStorage — есть cookie */ }
+        try { tamaSetCookie('duskey_pet_uid', id); } catch { /* переживём без cookie — есть localStorage */ }
         return id;
     } catch {
         if (!getTamaOwnerId._fallback) {
@@ -3509,6 +3526,14 @@ function tamaItemPickerRowsHtml(pet, kind) {
 // хранится в переменных и подставляется в разметку при каждом рендере
 let tamaFoodPickerOpen = false;
 let tamaToyPickerOpen = false;
+// та же проблема и то же решение для панелей смены цвета (🎨) и показа
+// идентификатора (🔑) — раньше состояние держалось только в DOM
+// (panel.hidden = ...), и периодический renderTamagotchi() (каждые 60с,
+// плюс после любого действия) полностью пересобирал разметку заново с
+// hidden по умолчанию — если пересборка попадала на момент, когда панель
+// была открыта, она молча захлопывалась без участия пользователя
+let tamaRecolorPanelOpen = false;
+let tamaLinkCodePanelOpen = false;
 function tamaFoodPickerHtml(pet) {
     return `<div class="tama-item-picker${tamaFoodPickerOpen ? ' is-open' : ''}" id="tamaFoodPicker">${tamaItemPickerRowsHtml(pet, 'food')}</div>`;
 }
@@ -3546,10 +3571,10 @@ function tamaStageHtml(pet) {
             <button type="button" class="tama-recolor-btn" id="tamaRecolorBtn" aria-label="Изменить цвет" title="Изменить цвет">🎨</button>
             <button type="button" class="tama-recolor-btn" id="tamaLinkCodeBtn" aria-label="Идентификатор питомца" title="Идентификатор питомца">🔑</button>
         </div>
-        <div class="tama-recolor-panel" id="tamaRecolorPanel" hidden>
+        <div class="tama-recolor-panel" id="tamaRecolorPanel"${tamaRecolorPanelOpen ? '' : ' hidden'}>
             <div class="tama-color-row">${tamaColorRowHtml(tamaColor)}</div>
         </div>
-        <div class="tama-linkcode-panel" id="tamaLinkCodePanel" hidden>
+        <div class="tama-linkcode-panel" id="tamaLinkCodePanel"${tamaLinkCodePanelOpen ? '' : ' hidden'}>
             ${pet.link_code
                 ? `<p class="tama-linkcode-hint">Введи этот код на другом устройстве или в боте, чтобы забрать питомца туда:</p>
                    <div class="tama-linkcode-row"><code id="tamaLinkCodeValue">${escapeHtml(pet.link_code)}</code><button type="button" class="tama-recolor-btn" id="tamaLinkCodeCopyBtn" title="Копировать">📋</button></div>`
@@ -4109,7 +4134,8 @@ function renderTamagotchi() {
     if (freePlayBtn) freePlayBtn.addEventListener('click', () => tamaDoAction('play', '💫'));
     document.getElementById('tamaSleepBtn').addEventListener('click', () => tamaDoAction(tamaPet.is_sleeping ? 'wake' : 'sleep', null));
     document.getElementById('tamaRecolorBtn').addEventListener('click', () => {
-        document.getElementById('tamaRecolorPanel').hidden = false;
+        tamaRecolorPanelOpen = !tamaRecolorPanelOpen;
+        document.getElementById('tamaRecolorPanel').hidden = !tamaRecolorPanelOpen;
     });
     card.querySelectorAll('.tama-recolor-panel .tama-color-swatch').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -4120,8 +4146,8 @@ function renderTamagotchi() {
     });
     const linkCodeBtn = document.getElementById('tamaLinkCodeBtn');
     if (linkCodeBtn) linkCodeBtn.addEventListener('click', () => {
-        const panel = document.getElementById('tamaLinkCodePanel');
-        panel.hidden = !panel.hidden;
+        tamaLinkCodePanelOpen = !tamaLinkCodePanelOpen;
+        document.getElementById('tamaLinkCodePanel').hidden = !tamaLinkCodePanelOpen;
     });
     const linkCodeCopyBtn = document.getElementById('tamaLinkCodeCopyBtn');
     if (linkCodeCopyBtn) linkCodeCopyBtn.addEventListener('click', async () => {
