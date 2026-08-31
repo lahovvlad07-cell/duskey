@@ -1015,6 +1015,13 @@ mark {
 }
 .tama-confirm-btn:active { transform: scale(0.97); }
 
+/* -- состояние "не получилось загрузить питомца" (см. tamaLoadErrorHtml) --
+   отдельная ветка от обычного пикера: если сервер/Supabase не ответил,
+   не предлагаем завести нового питомца поверх уже существующего в базе,
+   а даём просто повторить попытку */
+.tama-load-error { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 0; }
+.tama-load-error .tama-confirm-btn { padding: 0 22px; min-height: 40px; }
+
 /* -- сцена с питомцем -- */
 .tama-stage {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -2894,13 +2901,14 @@ document.addEventListener('keydown', (e) => {
 
 // ==================== ТАМАГОЧИ ====================
 // Бонусный питомец внизу страницы: выбор кота/собаки, кормление, игра,
-// сон. Состояние живёт в Supabase через свой мини-API на сервере
-// (см. routes/tamagotchi.js) — но если он недоступен (Supabase не
-// подключён, сеть легла и т.п.), сайт тихо переключается на локальное
-// хранение в localStorage, и питомец всё равно работает, просто не
-// синхронизируется между устройствами. Формулы "голода/бодрости/радости"
-// продублированы на клиенте (applyTamaDecay) и на сервере — если меняешь
-// цифры, меняй в обоих местах (см. комментарий в routes/tamagotchi.js).
+// сон. Состояние живёт только в Supabase через мини-API на сервере (см.
+// routes/tamagotchi.js) — никакого дублирующего локального хранилища на
+// устройстве больше нет: если сервер недоступен, действие просто не
+// выполняется и человек видит "Не получилось — попробуйте ещё раз" (см.
+// tamaDoAction/initTamagotchi). Формулы "голода/бодрости/радости"
+// продублированы на клиенте (applyTamaDecay, только для плавной анимации
+// полосок между опросами сервера) и на сервере — если меняешь цифры,
+// меняй в обоих местах (см. комментарий в routes/tamagotchi.js).
 // Баланс монет — важная заметка (2026): аудит показал, что при
 // HAPPY_PER_MIN=1/8 и суточном кулдауне глажки расход монет на радость
 // одними игрушками составлял ~135 монет/день при доходе ~25-30 монет/день —
@@ -2917,7 +2925,6 @@ const TAMA_HUNGER_PER_MIN = 1 / 6;     // +1 голода каждые 6 мин�
 const TAMA_ENERGY_AWAKE_PER_MIN = 1 / 5; // -1 бодрости каждые 5 минут, если не спит (было 1/6)
 const TAMA_ENERGY_SLEEP_PER_MIN = 2 / 10; // +2 бодрости каждые 10 минут, пока спит
 const TAMA_HAPPY_PER_MIN = 1 / 10;     // -1 радости каждые 10 минут (было 1/20)
-const TAMA_PET_COOLDOWN_MS = 3 * 60 * 1000; // поглаживание даёт награду не чаще раза в 3 минуты (см. PET_COOLDOWN_MS на сервере) — реакция (звук/анимация/сердечки) при этом не ограничена и срабатывает всегда
 
 // см. careEaseFactor в routes/tamagotchi.js — держим формулу идентичной
 function tamaCareEaseFactor(level) {
@@ -2925,43 +2932,19 @@ function tamaCareEaseFactor(level) {
     return Math.max(0.65, 1 - step);
 }
 
-// анти-фарм (см. HUNGER_FULL_MAX/HAPPY_PLAY_MAX/ENERGY_AWAKE_MAX в
-// routes/tamagotchi.js — держим идентичным): если потребность и так
-// закрыта, действие блокируется без траты еды/игрушки и без опыта —
-// питомец вместо этого "думает" вслух всплывающей мыслью над головой
-const TAMA_HUNGER_FULL_MAX = 8;
-const TAMA_HAPPY_PLAY_MAX = 92;
-const TAMA_ENERGY_AWAKE_MAX = 95;
-
 function tamaClamp(n) { return Math.max(0, Math.min(100, n)); }
 
 // -- прогресс, монеты, магазин, стрик --------------------------------
-// Вся эта логика (как и голод/бодрость/радость выше) продублирована на
-// сервере в routes/tamagotchi.js для офлайн-режима — правишь тут, правь
-// и там.
+// Уровни/опыт считает только сервер (см. awardXp в routes/tamagotchi.js);
+// клиент просто показывает то, что вернул сервер.
 function tamaXpToLevel(level) { return 40 + (level - 1) * 20; }
 
-// прибавляет опыт, сама разруливает левел-ап (может быть несколько
-// уровней разом, если xp прилетело много) и монетную награду за левел
-function tamaAwardXp(pet, amount) {
-    let xp = (pet.xp || 0) + amount;
-    let level = pet.level || 1;
-    let coins = pet.coins || 0;
-    let leveledUp = false;
-    while (xp >= tamaXpToLevel(level)) {
-        xp -= tamaXpToLevel(level);
-        level += 1;
-        coins += 10 + level * 2;
-        leveledUp = true;
-    }
-    return { pet: { ...pet, xp, level, coins }, leveledUp, newLevel: level };
-}
-
 // каталог магазина — общий "источник правды" для цен/эффектов, дублируется
-// в routes/tamagotchi.js для серверной проверки покупок и действий.
+// в routes/tamagotchi.js, который и выполняет все действия на сервере.
 // food/toy — расходники, копятся стопкой в pet.food / pet.toys и тратятся
-// по одному через кормление/игру (см. tamaApplyAction); accessory/background
-// — косметика, покупается один раз и потом переключается (tamaApplyEquip).
+// по одному через кормление/игру; accessory/background/furniture —
+// косметика, покупается один раз и потом переключается (см. applyBuy/
+// applyEquip в routes/tamagotchi.js).
 // coin-бэк за еду/игрушки и лимит монет за сон немного снижены (2026,
 // доп. правка) — по запросу должны начисляться "в пределах разумного":
 // см. подробный комментарий про баланс монет в routes/tamagotchi.js
@@ -2991,13 +2974,6 @@ const TAMA_SHOP_CATALOG = {
     chair_armchair: { name: 'Мягкое кресло',  emoji: '🛋️', price: 48, kind: 'furniture', levelReq: 3 },
     chair_throne:   { name: 'Трон',           emoji: '👑', price: 95, kind: 'furniture', levelReq: 7 },
 };
-// на случай, если в pet.food/toys лежит itemId, которого уже нет в
-// TAMA_SHOP_CATALOG (старая версия каталога, ручная правка и т.п.) — чтобы
-// такой предмет не блокировал кормление/игру молчаливой ошибкой, а просто
-// сработал по нейтральным базовым значениям
-const TAMA_FALLBACK_FOOD = { name: 'Еда', emoji: '🍽️', kind: 'food', hunger: 20, happiness: 5, xp: 4, coin: 1 };
-const TAMA_FALLBACK_TOY = { name: 'Игрушка', emoji: '🧸', kind: 'toy', happiness: 10, energy: 8, hunger: 6, xp: 5, coin: 1 };
-
 // редкость — чисто визуальная метка для магазина (цветная рамка/подпись),
 // геймплейно ни на что не влияет, поэтому в отличие от остального
 // каталога это НЕ дублируется на сервере (как и TAMA_PALETTE выше)
@@ -3027,8 +3003,8 @@ function tamaDailyDealId() {
 function tamaDealPrice(item) { return Math.max(1, Math.round(item.price * 0.7)); }
 
 // добивает недостающие поля прогресса у питомцев, заведённых до появления
-// этой фичи (старые записи в localStorage/Supabase) — без этого у них
-// были бы undefined level/coins/inventory и всё бы посыпалось
+// этой фичи (старые записи в Supabase) — без этого у них были бы
+// undefined level/coins/inventory и всё бы посыпалось
 function tamaEnsureFields(pet) {
     if (!pet) return pet;
     return {
@@ -3052,51 +3028,7 @@ function tamaTotalFood(pet) { return Object.values(pet.food || {}).reduce((a, b)
 function tamaTotalToys(pet) { return Object.values(pet.toys || {}).reduce((a, b) => a + b, 0); }
 
 function tamaTodayStr() { return new Date().toISOString().slice(0, 10); }
-function tamaYesterdayStr() { const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); }
 function tamaCanClaimDaily(pet) { return !pet || pet.last_daily_claim !== tamaTodayStr(); }
-
-// начисляет ежедневную награду и обновляет стрик — общая логика для
-// онлайн (routes/tamagotchi.js) и офлайн режимов
-function tamaDailyBonusRoll() { return 5 + Math.floor(Math.random() * 11); } // случайное 5..15
-function tamaApplyDailyClaim(pet) {
-    if (!tamaCanClaimDaily(pet)) return { blocked: 'Уже забрано сегодня — приходи завтра' };
-    const streak = pet.last_daily_claim === tamaYesterdayStr() ? (pet.streak || 0) + 1 : 1;
-    const bonusStreak = Math.min(streak, 10);
-    const coinsReward = tamaDailyBonusRoll() + (streak % 7 === 0 ? 50 : 0);
-    const xpReward = 15 + bonusStreak * 3;
-    const withCoins = { ...pet, coins: (pet.coins || 0) + coinsReward, streak, last_daily_claim: tamaTodayStr(), updated_at: new Date().toISOString() };
-    const xpRes = tamaAwardXp(withCoins, xpReward);
-    return { pet: xpRes.pet, mood: 'play', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel, reward: { coins: coinsReward, xp: xpReward, streak, weekly: streak % 7 === 0 } };
-}
-
-// покупка предмета в магазине: еда/игрушки копятся стопкой и тратятся по
-// одной при кормлении/игре (см. tamaApplyAction), косметика — разовая
-// покупка в инвентарь, надевается отдельным действием (tamaApplyEquip)
-function tamaApplyBuy(pet, itemId) {
-    const item = TAMA_SHOP_CATALOG[itemId];
-    if (!item) return { blocked: 'Неизвестный товар' };
-    if (item.levelReq && (pet.level || 1) < item.levelReq) return { blocked: `Доступно с ${item.levelReq} уровня` };
-    const price = itemId === tamaDailyDealId() ? tamaDealPrice(item) : item.price;
-    if ((pet.coins || 0) < price) return { blocked: 'Недостаточно монет' };
-    if (item.kind === 'food' || item.kind === 'toy') {
-        const field = item.kind === 'food' ? 'food' : 'toys';
-        const store = { ...(pet[field] || {}) };
-        store[itemId] = (store[itemId] || 0) + 1;
-        return { pet: { ...pet, coins: pet.coins - price, [field]: store, updated_at: new Date().toISOString() } };
-    }
-    // косметика — разовая покупка
-    if ((pet.inventory || []).includes(itemId)) return { blocked: 'Уже куплено' };
-    const next = { ...pet, coins: pet.coins - price, inventory: [...(pet.inventory || []), itemId], updated_at: new Date().toISOString() };
-    return { pet: next };
-}
-
-function tamaApplyEquip(pet, slot, itemId) {
-    if (itemId && !(pet.inventory || []).includes(itemId)) return { blocked: 'Это ещё не куплено' };
-    const field = slot === 'background' ? 'equipped_background' : slot === 'furniture' ? 'equipped_furniture' : 'equipped_accessory';
-    const current = pet[field] || null;
-    const next = current === itemId ? null : itemId; // повторный клик по надетому — снимает
-    return { pet: { ...pet, [field]: next, updated_at: new Date().toISOString() } };
-}
 
 // пересчитывает статы "на сейчас" по времени, прошедшему с последнего
 // обновления — не трогает исходный объект
@@ -3111,12 +3043,13 @@ function applyTamaDecay(pet) {
 
 // личность пользователя для привязки питомца: в Telegram — его id,
 // в обычном браузере — случайный идентификатор, который живёт в
-// localStorage. Оборачиваем в try/catch: в некоторых браузерах/режимах
-// (например, локальный файл file://, приватный режим Safari) обращение
-// к localStorage бросает исключение — без защиты это уронило бы вообще
-// весь скрипт на этой самой первой строке, и питомец не работал бы
-// целиком, даже офлайн-режим. Если localStorage недоступен — просто
-// используем id только на время сессии (без сохранения между визитами).
+// localStorage (это просто анонимный id устройства, не хранилище данных
+// питомца — то теперь только в Supabase). Оборачиваем в try/catch: в
+// некоторых браузерах/режимах (например, приватный режим Safari)
+// обращение к localStorage бросает исключение — без защиты это уронило
+// бы вообще весь скрипт на этой самой первой строке. Если localStorage
+// недоступен — просто используем id только на время сессии (без
+// сохранения между визитами).
 function getTamaOwnerId() {
     try {
         if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
@@ -3136,19 +3069,6 @@ function getTamaOwnerId() {
     }
 }
 
-const TAMA_LOCAL_KEY = 'duskey_pet_state_' + getTamaOwnerId();
-let tamaOffline = false; // true, если сервер/Supabase недоступны — используем только localStorage
-
-function tamaLoadLocal() {
-    try {
-        const raw = localStorage.getItem(TAMA_LOCAL_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-}
-function tamaSaveLocal(pet) {
-    try { localStorage.setItem(TAMA_LOCAL_KEY, JSON.stringify(pet)); } catch { /* квота/приватный режим/file:// — переживём без сохранения между визитами */ }
-}
-
 // цвет питомца — чисто визуальная настройка, сервер её не хранит (нет
 // такой колонки в tamagotchi_pets), поэтому живёт только тут, отдельным
 // ключом на владельца
@@ -3160,12 +3080,11 @@ function tamaSaveColor(key) {
     try { localStorage.setItem(TAMA_COLOR_KEY, key); } catch { /* переживём без сохранения */ }
 }
 
-// у fetch() к несуществующему серверу (например, открыли файл локально,
-// без сервера) в части браузеров есть шанс не отклониться быстро, а
-// зависнуть — тогда без ограничения по времени вся кнопка "виснет"
-// молча. Оборачиваем любой fetch тамагочи в гонку с таймаутом, чтобы
-// через 2.5с точно откатиться на localStorage, даже если сеть не
-// ответила вообще ничего.
+// у fetch() к серверу в части браузеров есть шанс не отклониться быстро, а
+// зависнуть — тогда без ограничения по времени вся кнопка "виснет" молча.
+// Оборачиваем любой fetch тамагочи в гонку с таймаутом, чтобы через 2.5с
+// точно получить ошибку и показать человеку "не получилось", а не ждать
+// зависший запрос бесконечно
 function tamaFetch(url, options) {
     return Promise.race([
         fetch(url, options),
@@ -3173,63 +3092,35 @@ function tamaFetch(url, options) {
     ]);
 }
 
-// единая точка доступа к состоянию питомца: сначала пробует серверный
-// /pet/..., при любой ошибке (нет Supabase, нет сети, таймаут) молча
-// уходит в localStorage и дальше работает только с ним
+// единая точка доступа к состоянию питомца — всегда через серверный
+// /pet/... (Supabase). Никакого дублирующего хранилища на устройстве:
+// если запрос не удался, ошибка просто всплывает наверх и её ловит
+// вызывающий код (см. tamaDoAction/initTamagotchi), показывая человеку
+// "не получилось, попробуйте ещё раз"
 const TamaStore = {
     async load() {
-        if (!tamaOffline) {
-            try {
-                const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`);
-                if (res.status === 404) return null;
-                if (!res.ok) throw new Error('bad status');
-                return tamaEnsureFields(await res.json());
-            } catch { tamaOffline = true; }
-        }
-        return tamaEnsureFields(tamaLoadLocal());
+        const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`);
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error('bad status');
+        return tamaEnsureFields(await res.json());
     },
     async create(species, name) {
-        const pet = {
-            species, name: name || (species === 'cat' ? 'Котёнок' : 'Щенок'), hunger: 20, energy: 90, happiness: 90, is_sleeping: false,
-            level: 1, xp: 0, coins: 12, streak: 0, last_daily_claim: null, inventory: [], equipped_accessory: null, equipped_background: null,
-            food: { food_crumbs: 3 }, toys: {}, last_pet_at: null,
-            updated_at: new Date().toISOString(),
-        };
-        if (!tamaOffline) {
-            try {
-                const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ species, name: pet.name }),
-                });
-                if (!res.ok) throw new Error('bad status');
-                return tamaEnsureFields(await res.json());
-            } catch { tamaOffline = true; }
-        }
-        tamaSaveLocal(pet);
-        return pet;
+        const petName = name || (species === 'cat' ? 'Котёнок' : 'Щенок');
+        const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ species, name: petName }),
+        });
+        if (!res.ok) throw new Error('bad status');
+        return tamaEnsureFields(await res.json());
     },
     async action(type, extra) {
-        if (!tamaOffline) {
-            try {
-                const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}/action`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: type, ...(extra || {}) }),
-                });
-                if (!res.ok) throw new Error('bad status');
-                return await res.json();
-            } catch { tamaOffline = true; }
-        }
-        // офлайн-версия того же самого действия — та же логика, что и на
-        // сервере (см. routes/tamagotchi.js), чтобы поведение совпадало
-        const pet = tamaEnsureFields(applyTamaDecay(tamaLoadLocal()));
-        const result = tamaApplyAction(pet, type, extra);
-        if (!result.blocked) tamaSaveLocal(result.pet);
-        return result;
+        const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}/action`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: type, ...(extra || {}) }),
+        });
+        if (!res.ok) throw new Error('bad status');
+        return await res.json();
     },
-    // привязка по идентификатору работает только через сервер — тут
-    // нечего подставлять из localStorage, весь смысл в том, чтобы
-    // забрать питомца, который может физически лежать в базе, а не на
-    // этом устройстве
     async linkByCode(code) {
         const res = await tamaFetch('/pet/link', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3237,97 +3128,10 @@ const TamaStore = {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Не удалось привязать питомца');
-        tamaOffline = false;
         return tamaEnsureFields(data);
     },
 };
 
-// одна и та же логика действий используется и в офлайн-режиме на клиенте,
-// и как образец для серверной версии в routes/tamagotchi.js — если
-// меняешь баланс, меняй в обоих местах
-function tamaApplyAction(pet, type, extra) {
-    if (type === 'buy') return tamaApplyBuy(pet, extra && extra.itemId);
-    if (type === 'equip') return tamaApplyEquip(pet, extra && extra.slot, extra && extra.itemId);
-    if (type === 'claim_daily') return tamaApplyDailyClaim(pet);
-
-    const next = { ...pet, updated_at: new Date().toISOString() };
-    if (type === 'feed') {
-        if (pet.is_sleeping) return { pet, blocked: 'Он спит — не будите!' };
-        if (pet.hunger <= TAMA_HUNGER_FULL_MAX) return { pet, blocked: 'Я не хочу есть — я сыт!' };
-        const itemId = extra && extra.itemId;
-        if (!itemId) return { pet, blocked: 'Нет такой еды — загляните в магазин' };
-        const owned = (pet.food || {})[itemId] || 0;
-        if (owned <= 0) return { pet, blocked: 'Этой еды не осталось — купите ещё в магазине' };
-        const item = TAMA_SHOP_CATALOG[itemId] || TAMA_FALLBACK_FOOD;
-        const food = { ...pet.food, [itemId]: owned - 1 };
-        next.food = food;
-        next.hunger = tamaClamp(pet.hunger - item.hunger);
-        next.happiness = tamaClamp(pet.happiness + item.happiness);
-        next.coins = (pet.coins || 0) + item.coin;
-        const xpRes = tamaAwardXp(next, item.xp);
-        return { pet: xpRes.pet, mood: 'eat', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
-    }
-    if (type === 'play') {
-        if (pet.is_sleeping) return { pet, blocked: 'Он спит — не будите!' };
-        if (pet.energy < 15) return { pet, blocked: 'Он устал, пусть сначала поспит' };
-        if (pet.happiness >= TAMA_HAPPY_PLAY_MAX) return { pet, blocked: 'Не хочу играть — мне и так весело!' };
-        const itemId = extra && extra.itemId;
-        if (itemId) {
-            const owned = (pet.toys || {})[itemId] || 0;
-            if (owned <= 0) return { pet, blocked: 'Этой игрушки не осталось — купите ещё в магазине' };
-            const item = TAMA_SHOP_CATALOG[itemId] || TAMA_FALLBACK_TOY;
-            next.toys = { ...pet.toys, [itemId]: owned - 1 };
-            next.happiness = tamaClamp(pet.happiness + item.happiness);
-            next.energy = tamaClamp(pet.energy - item.energy);
-            next.hunger = tamaClamp(pet.hunger + item.hunger);
-            next.coins = (pet.coins || 0) + item.coin;
-            const xpRes = tamaAwardXp(next, item.xp);
-            return { pet: xpRes.pet, mood: 'play', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
-        }
-        // обычная игра без игрушки — доступна всегда, но скромнее по наградам
-        next.happiness = tamaClamp(pet.happiness + 12);
-        next.energy = tamaClamp(pet.energy - 10);
-        next.hunger = tamaClamp(pet.hunger + 5);
-        next.coins = (pet.coins || 0) + 1;
-        const xpRes = tamaAwardXp(next, 6);
-        return { pet: xpRes.pet, mood: 'play', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
-    }
-    if (type === 'pet') {
-        // глажка свайпом по экрану — работает всегда, даже спящему (тихо,
-        // без награды), но реальная награда (радость/опыт) не чаще раза в
-        // TAMA_PET_COOLDOWN_MS, чтобы быстрый свайп не фармился в бесконечный
-        // XP — при этом сердечки на экране клиент показывает при каждом свайпе
-        if (pet.is_sleeping) return { pet, mood: 'sleep' };
-        const lastPet = pet.last_pet_at ? new Date(pet.last_pet_at).getTime() : 0;
-        if (Date.now() - lastPet < TAMA_PET_COOLDOWN_MS) return { pet, mood: 'pet' };
-        next.happiness = tamaClamp(pet.happiness + 6);
-        next.last_pet_at = new Date().toISOString();
-        const xpRes = tamaAwardXp(next, 2);
-        return { pet: xpRes.pet, mood: 'pet', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
-    }
-    if (type === 'sleep') {
-        if (pet.energy >= TAMA_ENERGY_AWAKE_MAX) return { pet, blocked: 'Не хочу спать — я и так бодрый!' };
-        next.is_sleeping = true;
-        return { pet: next, mood: 'sleep' };
-    }
-    if (type === 'wake') {
-        next.is_sleeping = false;
-        // награда за сон зависит от того, сколько реально проспал (по
-        // времени с последнего updated_at, т.е. с момента клика "спать") —
-        // так спам сон/будить не даёт монет, а честный отдых даёт
-        if (pet.is_sleeping) {
-            const minutesSlept = Math.max(0, (Date.now() - new Date(pet.updated_at).getTime()) / 60000);
-            const coinsEarned = Math.min(4, Math.floor(minutesSlept / 20)); // было min(6, /15) — сон тоже "чуть-чуть"
-            if (coinsEarned > 0) {
-                next.coins = (pet.coins || 0) + coinsEarned;
-                const xpRes = tamaAwardXp(next, coinsEarned * 2);
-                return { pet: xpRes.pet, mood: 'neutral', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel, reward: { coins: coinsEarned } };
-            }
-        }
-        return { pet: next, mood: 'neutral' };
-    }
-    return { pet };
-}
 let tamaSpeciesChoice = 'cat';
 let tamaColorChoice = tamaDefaultColor('cat'); // цвет, выбранный ДО того, как питомца завели
 let tamaColor = null; // цвет уже заведённого питомца (см. tamaLoadColor)
@@ -3508,6 +3312,15 @@ function tamaColorRowHtml(selected) {
     return Object.entries(TAMA_PALETTE).map(([key, c]) =>
         `<button type="button" class="tama-color-swatch${key === selected ? ' is-active' : ''}" data-color="${key}" style="--swatch-color:${c.base}" aria-label="${c.name}" title="${c.name}"></button>`
     ).join('');
+}
+
+function tamaLoadErrorHtml() {
+    return `
+        <div class="tama-load-error">
+            <p class="tama-picker-lead">Не получилось загрузить питомца — проверьте соединение и попробуйте ещё раз.</p>
+            <button type="button" class="tama-confirm-btn" id="tamaRetryBtn">Повторить</button>
+        </div>
+    `;
 }
 
 function tamaPickerHtml() {
@@ -4082,7 +3895,7 @@ function tamaHeartFx() {
 // сердечки, и каждое отпускание пальца всегда засчитывается действием
 // 'pet' — реакция (звук/анимация/сердечки) не ограничена по частоте,
 // ограничена только фактическая награда (радость/опыт), и то на уровне
-// TAMA_PET_COOLDOWN_MS внутри tamaApplyAction/сервера, а не здесь
+// TAMA_PET_COOLDOWN_MS на сервере (см. PET_COOLDOWN_MS в routes/tamagotchi.js), а не здесь
 const TAMA_PET_HEART_GAP_MS = 220;
 let tamaLastHeartAt = 0;
 // пока true — идёт активный жест поглаживания; фоновые автообновления
@@ -4164,6 +3977,12 @@ function renderTamagotchi() {
     tamaUpdateFab();
     const card = document.getElementById('tamaCard');
     const tabs = document.getElementById('tamaTabs');
+    if (tamaLoadFailed) {
+        tabs.hidden = true;
+        card.innerHTML = tamaLoadErrorHtml();
+        document.getElementById('tamaRetryBtn').addEventListener('click', () => { initTamagotchi(); });
+        return;
+    }
     if (!tamaPet) {
         tabs.hidden = true;
         card.innerHTML = tamaPickerHtml();
@@ -4191,9 +4010,9 @@ function renderTamagotchi() {
                 tamaSaveColor(tamaColor);
                 renderTamagotchi();
             } catch (e) {
-                // не должно происходить (TamaStore сам ловит свои ошибки и
-                // уходит в localStorage), но если что-то всё же прорвалось —
-                // лучше явно сказать об этом, чем молча ничего не делать
+                // теперь TamaStore ничего не ловит сам — при сбое сети/сервера
+                // ошибка долетает досюда по-настоящему, поэтому явно говорим
+                // об этом, а не молча ничего не делаем
                 console.error('tamagotchi create failed:', e);
                 btn.disabled = false;
                 const lead = card.querySelector('.tama-picker-lead');
@@ -4507,13 +4326,18 @@ function tamaCelebrateLevelUp(newLevel) {
     overlay.onclick = (e) => { if (e.target === overlay) close(); };
 }
 
+let tamaPet = null;
+let tamaLoadFailed = false; // true, если сервер/Supabase не ответил на загрузку — отличаем от "питомца ещё не завели", чтобы не предлагать завести нового поверх уже существующего в базе
+
 async function initTamagotchi() {
+    tamaLoadFailed = false;
     try {
         const stored = await TamaStore.load();
         tamaPet = stored ? applyTamaDecay(stored) : null;
     } catch (e) {
         console.error('tamagotchi init failed:', e);
         tamaPet = null;
+        tamaLoadFailed = true;
     }
     tamaColor = tamaLoadColor() || tamaDefaultColor(tamaPet ? tamaPet.species : 'cat');
     renderTamagotchi();
