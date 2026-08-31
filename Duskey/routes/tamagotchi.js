@@ -270,10 +270,17 @@ function applyAction(pet, type, extra) {
     }
     return { pet: next, mood: 'neutral' };
   }
+  if (type === 'admin_boost') {
+    // ВРЕМЕННАЯ admin-кнопка для тестирования — см. TAMA-ADMIN-TEMP в
+    // public/index.html. Убрать вместе с кнопками на клиенте, когда
+    // тестирование закончится.
+    next.level = 10;
+    next.xp = 0;
+    next.coins = (pet.coins || 0) + 1000;
+    return { pet: next, mood: 'happy' };
+  }
   return { pet };
 }
-
-// добивает недостающие поля прогресса у записей, заведённых до этой фичи
 function ensureFields(pet) {
   return {
     ...pet,
@@ -348,9 +355,22 @@ router.post('/pet/:ownerId', async (req, res) => {
   res.json(ensureFields(data));
 });
 
+// ВРЕМЕННЫЙ admin-эндпоинт для тестирования (см. TAMA-ADMIN-TEMP в
+// public/index.html, кнопка "Сбросить питомца") — полностью удаляет
+// запись питомца, чтобы на клиенте снова показался выбор вида/имени.
+// Убрать вместе с кнопками, когда тестирование закончится.
+router.delete('/pet/:ownerId', async (req, res) => {
+  const { error } = await supabase.from(TABLE).delete().eq('owner_id', req.params.ownerId);
+  if (error) {
+    console.error('tamagotchi admin reset error:', error);
+    return res.status(502).json({ ok: false, error: 'Не удалось сбросить питомца' });
+  }
+  res.json({ ok: true });
+});
+
 router.post('/pet/:ownerId/action', async (req, res) => {
   const { action, itemId, slot } = req.body || {};
-  if (!['feed', 'play', 'pet', 'sleep', 'wake', 'claim_daily', 'buy', 'equip'].includes(action)) {
+  if (!['feed', 'play', 'pet', 'sleep', 'wake', 'claim_daily', 'buy', 'equip', 'admin_boost'].includes(action)) {
     return res.status(400).json({ ok: false, error: 'Неизвестное действие' });
   }
   const { data: existing, error: readErr } = await supabase.from(TABLE).select('*').eq('owner_id', req.params.ownerId).maybeSingle();

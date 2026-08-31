@@ -1218,6 +1218,21 @@ mark {
 .tama-act-btn[disabled]:active { transform: none; }
 .tama-msg { min-height: 1.2em; margin-top: 10px; font-size: 0.78rem; color: var(--muted); text-align: center; }
 
+/* TAMA-ADMIN-TEMP — временные кнопки для ручного тестирования, вынесены
+   визуально отдельно (пунктирная рамка + красноватый акцент), чтобы не
+   перепутать с обычными игровыми действиями. Удалить вместе с разметкой
+   в tamaStageHtml() и обработчиками в renderTamagotchi(), когда
+   тестирование закончится */
+.tama-admin-row { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
+.tama-admin-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 8px; border-radius: var(--radius-md); border: 1px dashed #e0575f;
+  background: color-mix(in srgb, #e0575f 8%, var(--surface)); color: #c23f46;
+  font-size: 0.74rem; font-weight: 700; text-align: center; line-height: 1.25;
+  transition: background 0.15s var(--ease);
+}
+.tama-admin-btn:hover { background: color-mix(in srgb, #e0575f 16%, var(--surface)); }
+
 /* -- плавающая кнопка -- */
 .tama-fab {
   position: fixed; right: 18px; bottom: 18px; z-index: 60; width: 58px; height: 58px; border-radius: 50%;
@@ -3255,6 +3270,18 @@ const TamaStore = {
         if (!result.blocked) tamaSaveLocal(result.pet);
         return result;
     },
+    // ВРЕМЕННЫЙ admin-метод для тестирования (см. TAMA-ADMIN-TEMP в
+    // tamaStageHtml) — полностью стирает питомца, и на сервере (если он
+    // подключён), и локально, чтобы дальше снова показался выбор вида.
+    // Убрать вместе с кнопками, когда тестирование закончится.
+    async adminReset() {
+        if (!tamaOffline) {
+            try {
+                await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`, { method: 'DELETE' });
+            } catch { /* не критично — локально всё равно стираем ниже */ }
+        }
+        try { localStorage.removeItem(TAMA_LOCAL_KEY); } catch { /* приватный режим/квота — переживём */ }
+    },
 };
 
 // одна и та же логика действий используется и в офлайн-режиме на клиенте,
@@ -3341,10 +3368,18 @@ function tamaApplyAction(pet, type, extra) {
         }
         return { pet: next, mood: 'neutral' };
     }
+    if (type === 'admin_boost') {
+        // ВРЕМЕННАЯ admin-кнопка для тестирования — см. #tamaAdminRow в
+        // tamaStageHtml(). Не завязана на баланс/цены магазина, просто
+        // жёстко выставляет уровень и добавляет монеты. Убрать вместе с
+        // разметкой кнопок, когда тестирование закончится.
+        next.level = 10;
+        next.xp = 0;
+        next.coins = (pet.coins || 0) + 1000;
+        return { pet: next, mood: 'happy' };
+    }
     return { pet };
 }
-
-let tamaPet = null; // текущее состояние (уже с учётом decay) — источник правды для рендера
 let tamaSpeciesChoice = 'cat';
 let tamaColorChoice = tamaDefaultColor('cat'); // цвет, выбранный ДО того, как питомца завели
 let tamaColor = null; // цвет уже заведённого питомца (см. tamaLoadColor)
@@ -3464,7 +3499,7 @@ function tamaPetSvg(species, colorKey, accessoryId) {
                 <path d="M115 103 Q 124 96 133 103" stroke="#4a4363" stroke-width="3.2" fill="none" stroke-linecap="round"/>
             </g>
             <ellipse cx="100" cy="126" rx="7" ry="6" fill="#3d2d24"/>
-            <line class="mouth-neutral" x1="88" y1="133" x2="112" y2="133" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+            <path class="mouth-neutral" d="M86 133 Q 93 141 100 133 Q 107 141 114 133" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
             <g class="mouth-happy">
                 <path d="M86 132 Q 93 140 100 132 Q 107 140 114 132" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
             </g>
@@ -3510,7 +3545,7 @@ function tamaPetSvg(species, colorKey, accessoryId) {
             <path d="M113 105 Q 122 98 131 105" stroke="#4a4363" stroke-width="3.2" fill="none" stroke-linecap="round"/>
         </g>
         <path d="M100 121 q -5 0 -5 4.5 q 0 4.5 5 5.5 q 5 -1 5 -5.5 q 0 -4.5 -5 -4.5 z" fill="#e0708a"/>
-        <line class="mouth-neutral" x1="88" y1="132" x2="112" y2="132" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+        <path class="mouth-neutral" d="M86 132 Q 93 140 100 132 Q 107 140 114 132" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
         <g class="mouth-happy">
             <path d="M86 131 Q 93 139 100 131 Q 107 139 114 131" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
         </g>
@@ -3749,6 +3784,13 @@ function tamaStageHtml(pet) {
         ${tamaFoodPickerHtml(pet)}
         ${tamaToyPickerHtml(pet)}
         <p class="tama-msg" id="tamaMsg"></p>
+        <!-- TAMA-ADMIN-TEMP: временно для тестирования, убрать вместе с CSS
+             (.tama-admin-*) и обработчиками (#tamaAdminBoostBtn/#tamaAdminResetBtn
+             в renderTamagotchi) -->
+        <div class="tama-admin-row">
+            <button type="button" class="tama-admin-btn" id="tamaAdminBoostBtn">🔧 10 ур. + 1000🪙</button>
+            <button type="button" class="tama-admin-btn" id="tamaAdminResetBtn">🔧 Сбросить питомца</button>
+        </div>
     `;
 }
 
@@ -4272,6 +4314,19 @@ function renderTamagotchi() {
     });
     const dailyBanner = document.getElementById('tamaDailyBanner');
     if (dailyBanner) dailyBanner.addEventListener('click', () => tamaDoAction('claim_daily', null));
+
+    // TAMA-ADMIN-TEMP — см. разметку в tamaStageHtml() и CSS .tama-admin-*.
+    // Убрать вместе с ними, когда тестирование закончится.
+    const adminBoostBtn = document.getElementById('tamaAdminBoostBtn');
+    if (adminBoostBtn) adminBoostBtn.addEventListener('click', () => tamaDoAction('admin_boost', '⭐'));
+    const adminResetBtn = document.getElementById('tamaAdminResetBtn');
+    if (adminResetBtn) adminResetBtn.addEventListener('click', async () => {
+        if (!confirm('Точно сбросить питомца и вернуться к выбору вида?')) return;
+        adminResetBtn.disabled = true;
+        await TamaStore.adminReset();
+        tamaPet = null;
+        renderTamagotchi();
+    });
 }
 
 document.getElementById('tamaTabs').querySelectorAll('.tama-tab-btn').forEach((btn) => {
