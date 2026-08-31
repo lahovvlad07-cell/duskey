@@ -23,11 +23,18 @@ const TABLE = 'tamagotchi_pets';
 // монет/день — гарантированный уход в минус для активного игрока. Вернули
 // голод к прежней скорости, ослабили радость и сделали глажку регулярным
 // (не разовым) бесплатным источником радости — теперь вовлечённый игрок
-// покрывает большую часть радости просто взаимодействием, а не гриндом
-const HUNGER_PER_MIN = 1 / 8;        // +1 голода каждые 8 минут ("не заметно за сессию" лечим частотой обновления UI, не скоростью распада)
-const ENERGY_AWAKE_PER_MIN = 1 / 6;  // -1 бодрости каждые 6 минут, если не спит
+// покрывает большую часть радости просто взаимодействием, а не гриндом.
+//
+// 2026, повторная правка по запросу: голод/бодрость/радость должны падать
+// заметнее, чтобы за характеристиками хотелось следить минимум 2 раза в
+// день, но без фарма — coin-бэк за еду/игрушки/сон при этом снижен (см.
+// SHOP_CATALOG и sleep-награду ниже). Радость по-прежнему в основном
+// закрывается бесплатной регулярной глажкой, а не покупками, поэтому
+// ускорение её распада не давит на монетный баланс так, как раньше
+const HUNGER_PER_MIN = 1 / 6;        // +1 голода каждые 6 минут (было 1/8) — до "грустно" (75) ~7.5ч на 1 уровне
+const ENERGY_AWAKE_PER_MIN = 1 / 5;  // -1 бодрости каждые 5 минут, если не спит (было 1/6)
 const ENERGY_SLEEP_PER_MIN = 2 / 10; // +2 бодрости каждые 10 минут, пока спит
-const HAPPY_PER_MIN = 1 / 20;        // -1 радости каждые 20 минут (было 1/8 — это и есть основная причина перекоса)
+const HAPPY_PER_MIN = 1 / 10;        // -1 радости каждые 10 минут (было 1/20) — компенсируется бесплатной глажкой
 const PET_COOLDOWN_MS = 3 * 60 * 1000; // поглаживание даёт награду не чаще раза в 3 минуты — снова регулярный бесплатный источник радости, а не разовая награда раз в сутки
 
 // прокачка даёт не только косметику — с уровнем питомец становится
@@ -82,18 +89,24 @@ function awardXp(pet, amount) {
 // food/toy — расходники, копятся стопкой в pet.food / pet.toys и тратятся
 // по одному через кормление/игру; accessory/background — косметика,
 // покупается один раз и переключается через applyEquip
+// coin-бэк за еду/игрушки и лимит монет за сон немного снижены (2026,
+// доп. правка поверх аудита выше) — по запросу должны начисляться
+// "в пределах разумного": голод/бодрость теперь распадаются быстрее (см.
+// HUNGER_PER_MIN/ENERGY_AWAKE_PER_MIN), а компенсировать это чистым
+// coin-фармом через еду/сон/игрушки не должно быть слишком выгодно —
+// основной доход остаётся из ежедневного бонуса и уровней
 const SHOP_CATALOG = {
-  food_crumbs:   { price: 4,  kind: 'food', hunger: 15,  happiness: 2,  xp: 3,  coin: 2 },
-  food_kibble:   { price: 8,  kind: 'food', hunger: 30,  happiness: 4,  xp: 5,  coin: 2 },
-  food_canned:   { price: 14, kind: 'food', hunger: 45,  happiness: 6,  xp: 7,  coin: 2 },
-  food_fish:     { price: 22, kind: 'food', hunger: 60,  happiness: 10, xp: 10, coin: 2 },
-  food_steak:    { price: 34, kind: 'food', hunger: 80,  happiness: 14, xp: 14, coin: 3, levelReq: 3 },
-  food_cake:     { price: 50, kind: 'food', hunger: 100, happiness: 25, xp: 20, coin: 4, levelReq: 5 },
-  food_delicacy: { price: 75, kind: 'food', hunger: 100, happiness: 30, xp: 28, coin: 5, levelReq: 8 },
+  food_crumbs:   { price: 4,  kind: 'food', hunger: 15,  happiness: 2,  xp: 3,  coin: 1 },
+  food_kibble:   { price: 8,  kind: 'food', hunger: 30,  happiness: 4,  xp: 5,  coin: 1 },
+  food_canned:   { price: 14, kind: 'food', hunger: 45,  happiness: 6,  xp: 7,  coin: 1 },
+  food_fish:     { price: 22, kind: 'food', hunger: 60,  happiness: 10, xp: 10, coin: 1 },
+  food_steak:    { price: 34, kind: 'food', hunger: 80,  happiness: 14, xp: 14, coin: 2, levelReq: 3 },
+  food_cake:     { price: 50, kind: 'food', hunger: 100, happiness: 25, xp: 20, coin: 2, levelReq: 5 },
+  food_delicacy: { price: 75, kind: 'food', hunger: 100, happiness: 30, xp: 28, coin: 3, levelReq: 8 },
   toy_ball:      { price: 10, kind: 'toy', happiness: 12, energy: 8,  hunger: 6,  xp: 6,  coin: 1 },
-  toy_rope:      { price: 16, kind: 'toy', happiness: 18, energy: 10, hunger: 8,  xp: 9,  coin: 2 },
-  toy_frisbee:   { price: 26, kind: 'toy', happiness: 25, energy: 14, hunger: 10, xp: 13, coin: 2, levelReq: 3 },
-  toy_laser:     { price: 40, kind: 'toy', happiness: 35, energy: 18, hunger: 12, xp: 18, coin: 3, levelReq: 6 },
+  toy_rope:      { price: 16, kind: 'toy', happiness: 18, energy: 10, hunger: 8,  xp: 9,  coin: 1 },
+  toy_frisbee:   { price: 26, kind: 'toy', happiness: 25, energy: 14, hunger: 10, xp: 13, coin: 1, levelReq: 3 },
+  toy_laser:     { price: 40, kind: 'toy', happiness: 35, energy: 18, hunger: 12, xp: 18, coin: 2, levelReq: 6 },
   bow:       { price: 15, kind: 'accessory' },
   scarf:     { price: 18, kind: 'accessory' },
   glasses:   { price: 20, kind: 'accessory', levelReq: 2 },
@@ -103,6 +116,10 @@ const SHOP_CATALOG = {
   bg_night:  { price: 30, kind: 'background', levelReq: 2 },
   bg_space:  { price: 45, kind: 'background', levelReq: 4 },
   bg_aurora: { price: 70, kind: 'background', levelReq: 7 },
+  chair_stool:    { price: 12, kind: 'furniture' },
+  chair_wood:     { price: 26, kind: 'furniture' },
+  chair_armchair: { price: 48, kind: 'furniture', levelReq: 3 },
+  chair_throne:   { price: 95, kind: 'furniture', levelReq: 7 },
 };
 
 // см. TAMA_FALLBACK_FOOD/TOY в public/index.html — держим идентичным
@@ -129,11 +146,13 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 function yesterdayStr() { const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); }
 function canClaimDaily(pet) { return !pet || pet.last_daily_claim !== todayStr(); }
 
+function dailyBonusRoll() { return 5 + Math.floor(Math.random() * 11); } // случайное 5..15
+
 function applyDailyClaim(pet) {
   if (!canClaimDaily(pet)) return { blocked: 'Уже забрано сегодня — приходи завтра' };
   const streak = pet.last_daily_claim === yesterdayStr() ? (pet.streak || 0) + 1 : 1;
   const bonusStreak = Math.min(streak, 10);
-  const coinsReward = 14 + bonusStreak * 2 + (streak % 7 === 0 ? 50 : 0);
+  const coinsReward = dailyBonusRoll() + (streak % 7 === 0 ? 50 : 0);
   const xpReward = 15 + bonusStreak * 3;
   const withCoins = { ...pet, coins: (pet.coins || 0) + coinsReward, streak, last_daily_claim: todayStr(), updated_at: new Date().toISOString() };
   const xpRes = awardXp(withCoins, xpReward);
@@ -161,7 +180,7 @@ function applyBuy(pet, itemId) {
 
 function applyEquip(pet, slot, itemId) {
   if (itemId && !(pet.inventory || []).includes(itemId)) return { blocked: 'Это ещё не куплено' };
-  const field = slot === 'background' ? 'equipped_background' : 'equipped_accessory';
+  const field = slot === 'background' ? 'equipped_background' : slot === 'furniture' ? 'equipped_furniture' : 'equipped_accessory';
   const current = pet[field] || null;
   const next = current === itemId ? null : itemId;
   return { pet: { ...pet, [field]: next, updated_at: new Date().toISOString() } };
@@ -242,7 +261,7 @@ function applyAction(pet, type, extra) {
     // даёт монет, а честный отдых даёт
     if (pet.is_sleeping) {
       const minutesSlept = Math.max(0, (Date.now() - new Date(pet.updated_at).getTime()) / 60000);
-      const coinsEarned = Math.min(6, Math.floor(minutesSlept / 15));
+      const coinsEarned = Math.min(4, Math.floor(minutesSlept / 20)); // было min(6, /15) — сон тоже "чуть-чуть", не основной заработок
       if (coinsEarned > 0) {
         next.coins = (pet.coins || 0) + coinsEarned;
         const xpRes = awardXp(next, coinsEarned * 2);
@@ -266,6 +285,7 @@ function ensureFields(pet) {
     inventory: pet.inventory || [],
     equipped_accessory: pet.equipped_accessory || null,
     equipped_background: pet.equipped_background || null,
+    equipped_furniture: pet.equipped_furniture || null,
     food: pet.food || {},
     toys: pet.toys || {},
     last_pet_at: pet.last_pet_at || null,
@@ -312,6 +332,7 @@ router.post('/pet/:ownerId', async (req, res) => {
     inventory: [],
     equipped_accessory: null,
     equipped_background: null,
+    equipped_furniture: null,
     food: { food_crumbs: 3 }, // стартовый набор, чтобы было чем покормить сразу
     toys: {},
     last_pet_at: null,

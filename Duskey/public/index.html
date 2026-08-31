@@ -1090,6 +1090,18 @@ mark {
 .tama-pet.mood-sleep .tama-pet-svg .eyes-closed { display: block; }
 .tama-pet.mood-sleep .tama-pet-svg { animation: tamaSleepBreathe 3.2s ease-in-out infinite; }
 .tama-pet.mood-sleep .tama-pet-shadow { opacity: 0.6; }
+
+/* --- мебель из магазина (см. TAMA_FURNITURE_SVG) — рисуется под питомцем
+   внутри того же .tama-pet, поэтому в DOM стоит раньше SVG питомца и по
+   умолчанию (без z-index) остаётся позади него. Своя тень уже есть у самой
+   SVG мебели (эллипс у подножия ножек), поэтому отдельную тень питомца
+   в этом случае прячем — иначе получались бы две тени на разной высоте */
+.tama-furniture {
+  position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%);
+  width: 118px; pointer-events: none;
+}
+.tama-furniture svg { display: block; width: 100%; height: auto; }
+.tama-pet.has-furniture .tama-pet-shadow { display: none; }
 @keyframes tamaChomp { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.6); } }
 @keyframes tamaSleepBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
 .tama-pet.mood-play { animation: tamaJump 0.5s ease-in-out 2; }
@@ -1241,7 +1253,12 @@ mark {
   border-radius: 22px 22px 0 0; box-shadow: 0 -18px 44px -20px rgba(0,0,0,0.55);
   overflow-y: auto; overscroll-behavior: contain; transform: translateY(100%);
   transition: transform 0.28s var(--ease); padding-bottom: 14px;
+  /* сама панель уже даёт понять, что можно листать (виден край следующего
+     блока), плюс есть "ручка"-полоска сверху (.tama-panel-handle) — так что
+     системный скроллбар сбоку был лишним и выглядел как случайная линия */
+  scrollbar-width: none; -ms-overflow-style: none;
 }
+.tama-panel::-webkit-scrollbar { display: none; }
 .tama-panel[hidden] { display: none; }
 .tama-panel.is-visible { transform: translateY(0); }
 .tama-panel-handle { width: 36px; height: 4px; border-radius: var(--radius-pill); background: var(--line-strong); margin: 10px auto 0; }
@@ -1613,7 +1630,7 @@ mark {
                     <span class="brand-name">Duskey</span>
                 </div>
                 <div class="top-actions">
-                    <a class="tg-pill" href="https://t.me/duskey_market" target="_blank" rel="noopener">
+                    <a class="tg-pill" href="https://t.me/Duskey_Market" target="_blank" rel="noopener">
                         <svg viewBox="0 0 240 240" fill="currentColor" stroke="none"><path d="M120 0a120 120 0 1 0 0 240 120 120 0 0 0 0-240zm55.6 81.7-18.7 88.2c-1.4 6.3-5.1 7.9-10.3 4.9l-28.5-21-13.7 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2l-65.1 41-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9l109.8-42.3c5.1-1.9 9.6 1.2 7.9 8.7z"/></svg>
                         <span class="tg-pill-label">Канал в Telegram</span>
                     </a>
@@ -1734,7 +1751,7 @@ mark {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
                 <span>Поддержка</span>
             </a>
-            <a class="footer-link" href="https://t.me/duskey_market" target="_blank" rel="noopener">
+            <a class="footer-link" href="https://t.me/Duskey_Market" target="_blank" rel="noopener">
                 <svg viewBox="0 0 240 240" fill="currentColor" stroke="none"><path d="M120 0a120 120 0 1 0 0 240 120 120 0 0 0 0-240zm55.6 81.7-18.7 88.2c-1.4 6.3-5.1 7.9-10.3 4.9l-28.5-21-13.7 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2l-65.1 41-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9l109.8-42.3c5.1-1.9 9.6 1.2 7.9 8.7z"/></svg>
                 <span>Сообщество</span>
             </a>
@@ -2919,10 +2936,16 @@ document.addEventListener('keydown', (e) => {
 // гарантированный уход в минус. Голод вернули к прежней скорости, радость
 // ослабили и сделали глажку регулярным (не разовым) источником радости —
 // см. подробный комментарий в routes/tamagotchi.js
-const TAMA_HUNGER_PER_MIN = 1 / 8;     // +1 голода каждые 8 минут (см. HUNGER_PER_MIN на сервере — держим идентичным)
-const TAMA_ENERGY_AWAKE_PER_MIN = 1 / 6; // -1 бодрости каждые 6 минут, если не спит
+//
+// 2026, повторная правка по запросу: характеристики должны падать
+// заметнее (минимум 2 захода в день), но coin-бэк за еду/игрушки/сон при
+// этом снижен — см. TAMA_SHOP_CATALOG и лимит монет за сон. Радость
+// по-прежнему в основном закрывается бесплатной регулярной глажкой,
+// поэтому ускорение её распада не бьёт по монетному балансу
+const TAMA_HUNGER_PER_MIN = 1 / 6;     // +1 голода каждые 6 минут (было 1/8; см. HUNGER_PER_MIN на сервере — держим идентичным)
+const TAMA_ENERGY_AWAKE_PER_MIN = 1 / 5; // -1 бодрости каждые 5 минут, если не спит (было 1/6)
 const TAMA_ENERGY_SLEEP_PER_MIN = 2 / 10; // +2 бодрости каждые 10 минут, пока спит
-const TAMA_HAPPY_PER_MIN = 1 / 20;     // -1 радости каждые 20 минут
+const TAMA_HAPPY_PER_MIN = 1 / 10;     // -1 радости каждые 10 минут (было 1/20)
 const TAMA_PET_COOLDOWN_MS = 3 * 60 * 1000; // поглаживание даёт награду не чаще раза в 3 минуты (см. PET_COOLDOWN_MS на сервере) — реакция (звук/анимация/сердечки) при этом не ограничена и срабатывает всегда
 
 // см. careEaseFactor в routes/tamagotchi.js — держим формулу идентичной
@@ -2967,19 +2990,22 @@ function tamaAwardXp(pet, amount) {
 // в routes/tamagotchi.js для серверной проверки покупок и действий.
 // food/toy — расходники, копятся стопкой в pet.food / pet.toys и тратятся
 // по одному через кормление/игру (см. tamaApplyAction); accessory/background
-// — косметика, покупается один раз и потом переключается (tamaApplyEquip)
+// — косметика, покупается один раз и потом переключается (tamaApplyEquip).
+// coin-бэк за еду/игрушки и лимит монет за сон немного снижены (2026,
+// доп. правка) — по запросу должны начисляться "в пределах разумного":
+// см. подробный комментарий про баланс монет в routes/tamagotchi.js
 const TAMA_SHOP_CATALOG = {
-    food_crumbs:    { name: 'Крошки',           emoji: '🍪', price: 4,  kind: 'food', hunger: 15, happiness: 2,  xp: 3,  coin: 2 },
-    food_kibble:    { name: 'Корм',             emoji: '🥫', price: 8,  kind: 'food', hunger: 30, happiness: 4,  xp: 5,  coin: 2 },
-    food_canned:    { name: 'Консервы',         emoji: '🍱', price: 14, kind: 'food', hunger: 45, happiness: 6,  xp: 7,  coin: 2 },
-    food_fish:      { name: 'Рыбка',            emoji: '🐟', price: 22, kind: 'food', hunger: 60, happiness: 10, xp: 10, coin: 2 },
-    food_steak:     { name: 'Стейк',            emoji: '🥩', price: 34, kind: 'food', hunger: 80, happiness: 14, xp: 14, coin: 3, levelReq: 3 },
-    food_cake:      { name: 'Праздничный торт', emoji: '🎂', price: 50, kind: 'food', hunger: 100, happiness: 25, xp: 20, coin: 4, levelReq: 5 },
-    food_delicacy:  { name: 'Деликатес шефа',   emoji: '🍣', price: 75, kind: 'food', hunger: 100, happiness: 30, xp: 28, coin: 5, levelReq: 8 },
+    food_crumbs:    { name: 'Крошки',           emoji: '🍪', price: 4,  kind: 'food', hunger: 15, happiness: 2,  xp: 3,  coin: 1 },
+    food_kibble:    { name: 'Корм',             emoji: '🥫', price: 8,  kind: 'food', hunger: 30, happiness: 4,  xp: 5,  coin: 1 },
+    food_canned:    { name: 'Консервы',         emoji: '🍱', price: 14, kind: 'food', hunger: 45, happiness: 6,  xp: 7,  coin: 1 },
+    food_fish:      { name: 'Рыбка',            emoji: '🐟', price: 22, kind: 'food', hunger: 60, happiness: 10, xp: 10, coin: 1 },
+    food_steak:     { name: 'Стейк',            emoji: '🥩', price: 34, kind: 'food', hunger: 80, happiness: 14, xp: 14, coin: 2, levelReq: 3 },
+    food_cake:      { name: 'Праздничный торт', emoji: '🎂', price: 50, kind: 'food', hunger: 100, happiness: 25, xp: 20, coin: 2, levelReq: 5 },
+    food_delicacy:  { name: 'Деликатес шефа',   emoji: '🍣', price: 75, kind: 'food', hunger: 100, happiness: 30, xp: 28, coin: 3, levelReq: 8 },
     toy_ball:       { name: 'Мячик',            emoji: '🎾', price: 10, kind: 'toy', happiness: 12, energy: 8,  hunger: 6,  xp: 6,  coin: 1 },
-    toy_rope:       { name: 'Верёвка',          emoji: '🪢', price: 16, kind: 'toy', happiness: 18, energy: 10, hunger: 8,  xp: 9,  coin: 2 },
-    toy_frisbee:    { name: 'Фрисби',           emoji: '🥏', price: 26, kind: 'toy', happiness: 25, energy: 14, hunger: 10, xp: 13, coin: 2, levelReq: 3 },
-    toy_laser:      { name: 'Лазер-игрушка',    emoji: '🔴', price: 40, kind: 'toy', happiness: 35, energy: 18, hunger: 12, xp: 18, coin: 3, levelReq: 6 },
+    toy_rope:       { name: 'Верёвка',          emoji: '🪢', price: 16, kind: 'toy', happiness: 18, energy: 10, hunger: 8,  xp: 9,  coin: 1 },
+    toy_frisbee:    { name: 'Фрисби',           emoji: '🥏', price: 26, kind: 'toy', happiness: 25, energy: 14, hunger: 10, xp: 13, coin: 1, levelReq: 3 },
+    toy_laser:      { name: 'Лазер-игрушка',    emoji: '🔴', price: 40, kind: 'toy', happiness: 35, energy: 18, hunger: 12, xp: 18, coin: 2, levelReq: 6 },
     bow:        { name: 'Бантик',    emoji: '🎀', price: 15, kind: 'accessory' },
     scarf:      { name: 'Шарф',      emoji: '🧣', price: 18, kind: 'accessory' },
     glasses:    { name: 'Очки',      emoji: '🕶️', price: 20, kind: 'accessory', levelReq: 2 },
@@ -2989,6 +3015,10 @@ const TAMA_SHOP_CATALOG = {
     bg_night:   { name: 'Ночь',      emoji: '🌙', price: 30, kind: 'background', levelReq: 2 },
     bg_space:   { name: 'Космос',    emoji: '🪐', price: 45, kind: 'background', levelReq: 4 },
     bg_aurora:  { name: 'Сияние',    emoji: '🌈', price: 70, kind: 'background', levelReq: 7 },
+    chair_stool:    { name: 'Табурет',        emoji: '🪑', price: 12, kind: 'furniture' },
+    chair_wood:     { name: 'Стул',           emoji: '💺', price: 26, kind: 'furniture' },
+    chair_armchair: { name: 'Мягкое кресло',  emoji: '🛋️', price: 48, kind: 'furniture', levelReq: 3 },
+    chair_throne:   { name: 'Трон',           emoji: '👑', price: 95, kind: 'furniture', levelReq: 7 },
 };
 // на случай, если в pet.food/toys лежит itemId, которого уже нет в
 // TAMA_SHOP_CATALOG (старая версия каталога, ручная правка и т.п.) — чтобы
@@ -3006,6 +3036,7 @@ const TAMA_RARITY = {
     toy_ball: 'common', toy_rope: 'common', toy_frisbee: 'rare', toy_laser: 'epic',
     bow: 'common', scarf: 'common', glasses: 'rare', cap: 'rare', crown: 'legendary',
     bg_sunset: 'rare', bg_night: 'rare', bg_space: 'epic', bg_aurora: 'legendary',
+    chair_stool: 'common', chair_wood: 'common', chair_armchair: 'rare', chair_throne: 'legendary',
 };
 const TAMA_RARITY_LABEL = { common: '', rare: 'Редкий', epic: 'Эпик', legendary: 'Легенда' };
 
@@ -3039,6 +3070,7 @@ function tamaEnsureFields(pet) {
         inventory: pet.inventory || [],
         equipped_accessory: pet.equipped_accessory || null,
         equipped_background: pet.equipped_background || null,
+        equipped_furniture: pet.equipped_furniture || null,
         food: pet.food || {},
         toys: pet.toys || {},
         last_pet_at: pet.last_pet_at || null,
@@ -3054,11 +3086,12 @@ function tamaCanClaimDaily(pet) { return !pet || pet.last_daily_claim !== tamaTo
 
 // начисляет ежедневную награду и обновляет стрик — общая логика для
 // онлайн (routes/tamagotchi.js) и офлайн режимов
+function tamaDailyBonusRoll() { return 5 + Math.floor(Math.random() * 11); } // случайное 5..15
 function tamaApplyDailyClaim(pet) {
     if (!tamaCanClaimDaily(pet)) return { blocked: 'Уже забрано сегодня — приходи завтра' };
     const streak = pet.last_daily_claim === tamaYesterdayStr() ? (pet.streak || 0) + 1 : 1;
     const bonusStreak = Math.min(streak, 10);
-    const coinsReward = 14 + bonusStreak * 2 + (streak % 7 === 0 ? 50 : 0);
+    const coinsReward = tamaDailyBonusRoll() + (streak % 7 === 0 ? 50 : 0);
     const xpReward = 15 + bonusStreak * 3;
     const withCoins = { ...pet, coins: (pet.coins || 0) + coinsReward, streak, last_daily_claim: tamaTodayStr(), updated_at: new Date().toISOString() };
     const xpRes = tamaAwardXp(withCoins, xpReward);
@@ -3088,7 +3121,7 @@ function tamaApplyBuy(pet, itemId) {
 
 function tamaApplyEquip(pet, slot, itemId) {
     if (itemId && !(pet.inventory || []).includes(itemId)) return { blocked: 'Это ещё не куплено' };
-    const field = slot === 'background' ? 'equipped_background' : 'equipped_accessory';
+    const field = slot === 'background' ? 'equipped_background' : slot === 'furniture' ? 'equipped_furniture' : 'equipped_accessory';
     const current = pet[field] || null;
     const next = current === itemId ? null : itemId; // повторный клик по надетому — снимает
     return { pet: { ...pet, [field]: next, updated_at: new Date().toISOString() } };
@@ -3299,7 +3332,7 @@ function tamaApplyAction(pet, type, extra) {
         // так спам сон/будить не даёт монет, а честный отдых даёт
         if (pet.is_sleeping) {
             const minutesSlept = Math.max(0, (Date.now() - new Date(pet.updated_at).getTime()) / 60000);
-            const coinsEarned = Math.min(6, Math.floor(minutesSlept / 15));
+            const coinsEarned = Math.min(4, Math.floor(minutesSlept / 20)); // было min(6, /15) — сон тоже "чуть-чуть"
             if (coinsEarned > 0) {
                 next.coins = (pet.coins || 0) + coinsEarned;
                 const xpRes = tamaAwardXp(next, coinsEarned * 2);
@@ -3335,6 +3368,59 @@ const TAMA_PALETTE = {
     blossom:  { name: 'Сакура',     base: '#ff9fc4', light: '#ffdcea', dark: '#e97ba3', blush: '#ff7d9c' },
 };
 function tamaDefaultColor(species) { return species === 'dog' ? 'honey' : 'peach'; }
+
+// мебель под питомцем (см. TAMA_SHOP_CATALOG, kind: 'furniture') — та же
+// плоская "кавайная" векторная манера, что и у самого питомца. Рисуется
+// ПЕРЕД SVG питомца внутри одного контейнера .tama-pet, поэтому по
+// умолчанию (без z-index) оказывается позади него в порядке отрисовки —
+// питомец визуально сидит на стуле, а не проваливается сквозь него
+const TAMA_FURNITURE_SVG = {
+    chair_stool: `<svg viewBox="0 0 120 62" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="60" cy="56" rx="34" ry="5" fill="rgba(0,0,0,0.2)"/>
+        <rect x="20" y="30" width="8" height="24" rx="2" fill="#8a5a34"/>
+        <rect x="92" y="30" width="8" height="24" rx="2" fill="#8a5a34"/>
+        <rect x="32" y="34" width="8" height="20" rx="2" fill="#7a4d2c"/>
+        <rect x="80" y="34" width="8" height="20" rx="2" fill="#7a4d2c"/>
+        <ellipse cx="60" cy="26" rx="42" ry="12" fill="#a9713f"/>
+        <ellipse cx="60" cy="22" rx="42" ry="12" fill="#c48a52"/>
+    </svg>`,
+    chair_wood: `<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="60" cy="74" rx="34" ry="5" fill="rgba(0,0,0,0.2)"/>
+        <rect x="20" y="6" width="9" height="46" rx="3" fill="#6b4226"/>
+        <rect x="91" y="6" width="9" height="46" rx="3" fill="#6b4226"/>
+        <rect x="24" y="6" width="72" height="11" rx="4" fill="#8a5a34"/>
+        <rect x="20" y="44" width="8" height="28" rx="2" fill="#6b4226"/>
+        <rect x="92" y="44" width="8" height="28" rx="2" fill="#6b4226"/>
+        <rect x="32" y="48" width="8" height="24" rx="2" fill="#5c3820"/>
+        <rect x="80" y="48" width="8" height="24" rx="2" fill="#5c3820"/>
+        <ellipse cx="60" cy="42" rx="40" ry="10" fill="#a9713f"/>
+        <ellipse cx="60" cy="38" rx="40" ry="10" fill="#c48a52"/>
+    </svg>`,
+    chair_armchair: `<svg viewBox="0 0 132 82" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="66" cy="76" rx="40" ry="5" fill="rgba(0,0,0,0.22)"/>
+        <rect x="10" y="30" width="14" height="36" rx="7" fill="#c96b6b"/>
+        <rect x="108" y="30" width="14" height="36" rx="7" fill="#c96b6b"/>
+        <rect x="18" y="10" width="96" height="42" rx="16" fill="#e0837f"/>
+        <ellipse cx="66" cy="48" rx="48" ry="16" fill="#f0a09a"/>
+        <rect x="20" y="60" width="10" height="14" rx="3" fill="#8a5a4a"/>
+        <rect x="102" y="60" width="10" height="14" rx="3" fill="#8a5a4a"/>
+    </svg>`,
+    chair_throne: `<svg viewBox="0 0 132 102" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="66" cy="96" rx="42" ry="5" fill="rgba(0,0,0,0.24)"/>
+        <path d="M30 6 L44 0 L58 8 L66 0 L74 8 L88 0 L102 6 L96 40 L36 40 Z" fill="#e6a23c"/>
+        <rect x="30" y="34" width="72" height="36" rx="6" fill="#d68a2c"/>
+        <rect x="14" y="40" width="16" height="32" rx="6" fill="#c9781f"/>
+        <rect x="102" y="40" width="16" height="32" rx="6" fill="#c9781f"/>
+        <ellipse cx="66" cy="60" rx="45" ry="14" fill="#a4243b"/>
+        <rect x="24" y="72" width="10" height="20" rx="3" fill="#8a6a2a"/>
+        <rect x="98" y="72" width="10" height="20" rx="3" fill="#8a6a2a"/>
+    </svg>`,
+};
+function tamaFurnitureHtml(furnitureId) {
+    const svg = TAMA_FURNITURE_SVG[furnitureId];
+    if (!svg) return '';
+    return `<div class="tama-furniture tama-furniture-${furnitureId}">${svg}</div>`;
+}
 
 // одна и та же SVG-иллюстрация используется и в маленьком превью выбора, и
 // в полный размер на сцене — она сама масштабируется под контейнер
@@ -3383,7 +3469,7 @@ function tamaPetSvg(species, colorKey, accessoryId) {
                 <path d="M86 132 Q 93 140 100 132 Q 107 140 114 132" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
             </g>
             <path class="mouth-sad" d="M82 143 Q 100 131 118 143" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-            <line class="mouth-sleep" x1="94" y1="134" x2="106" y2="134" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+            <path class="mouth-sleep" d="M91 133 Q 95.5 137 100 133 Q 104.5 137 109 133" stroke="#3d2d24" stroke-width="2.2" fill="none" stroke-linecap="round"/>
             <ellipse class="mouth-eat" cx="100" cy="134" rx="6" ry="6" fill="#3d2d24"/>
             ${acc}
         </svg>`;
@@ -3429,7 +3515,7 @@ function tamaPetSvg(species, colorKey, accessoryId) {
             <path d="M86 131 Q 93 139 100 131 Q 107 139 114 131" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
         </g>
         <path class="mouth-sad" d="M83 142 Q 100 130 117 142" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-        <line class="mouth-sleep" x1="94" y1="133" x2="106" y2="133" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+        <path class="mouth-sleep" d="M91 132 Q 95.5 136 100 132 Q 104.5 136 109 132" stroke="#3d2d24" stroke-width="2.2" fill="none" stroke-linecap="round"/>
         <ellipse class="mouth-eat" cx="100" cy="133" rx="6" ry="6" fill="#3d2d24"/>
         ${acc}
     </svg>`;
@@ -3629,12 +3715,14 @@ function tamaToyPickerHtml(pet) {
 function tamaStageHtml(pet) {
     const mood = tamaMood(pet);
     const bgId = pet.equipped_background;
+    const furnitureId = pet.equipped_furniture;
     return `
         ${tamaTopbarHtml(pet)}
         ${tamaDailyBannerHtml(pet)}
         <div class="tama-stage${bgId ? ' has-bg' : ''}"${bgId ? ` data-bg="${bgId}"` : ''}>
-            <div class="tama-pet tama-pet-touch species-${pet.species} mood-${mood}" id="tamaPet">
+            <div class="tama-pet tama-pet-touch species-${pet.species} mood-${mood}${furnitureId ? ' has-furniture' : ''}" id="tamaPet">
                 <div class="tama-thought" id="tamaThought"></div>
+                ${tamaFurnitureHtml(furnitureId)}
                 ${tamaPetSvg(pet.species, tamaColor, pet.equipped_accessory)}
                 ${mood === 'sleep' ? '<div class="tama-zzz"><span>z</span><span>Z</span><span>Z</span></div>' : ''}
                 <div class="tama-pet-shadow"></div>
@@ -3670,7 +3758,7 @@ function tamaShopSectionHtml(pet, kind, title) {
     const dealId = tamaDailyDealId();
     const cards = items.map(([id, item]) => {
         const owned = (pet.inventory || []).includes(id);
-        const equippedField = kind === 'background' ? 'equipped_background' : 'equipped_accessory';
+        const equippedField = kind === 'background' ? 'equipped_background' : kind === 'furniture' ? 'equipped_furniture' : 'equipped_accessory';
         const isEquipped = owned && pet[equippedField] === id;
         const locked = item.levelReq && (pet.level || 1) < item.levelReq;
         const stackCount = kind === 'food' ? (pet.food || {})[id] || 0 : kind === 'toy' ? (pet.toys || {})[id] || 0 : 0;
@@ -3692,7 +3780,7 @@ function tamaShopSectionHtml(pet, kind, title) {
             const disabled = (pet.coins || 0) < price;
             btnHtml = `<button type="button" class="tama-shop-btn" data-buy="${id}" ${disabled ? 'disabled' : ''}>Купить · ${priceHtml}</button>`;
         } else {
-            btnHtml = `<button type="button" class="tama-shop-btn ${isEquipped ? 'is-equipped-btn' : 'is-owned'}" data-equip="${id}" data-slot="${kind === 'background' ? 'background' : 'accessory'}">${isEquipped ? 'Снять' : 'Надеть'}</button>`;
+            btnHtml = `<button type="button" class="tama-shop-btn ${isEquipped ? 'is-equipped-btn' : 'is-owned'}" data-equip="${id}" data-slot="${kind === 'background' ? 'background' : kind === 'furniture' ? 'furniture' : 'accessory'}">${isEquipped ? 'Снять' : 'Надеть'}</button>`;
         }
         return `
             <div class="tama-shop-item${isEquipped ? ' is-equipped' : ''}${isDeal ? ' is-deal' : ''}" data-rarity="${rarity}">
@@ -3720,6 +3808,7 @@ function tamaShopHtml(pet) {
         ${tamaShopSectionHtml(pet, 'food', 'Еда')}
         ${tamaShopSectionHtml(pet, 'toy', 'Игрушки')}
         ${tamaShopSectionHtml(pet, 'accessory', 'Аксессуары')}
+        ${tamaShopSectionHtml(pet, 'furniture', 'Мебель')}
         ${tamaShopSectionHtml(pet, 'background', 'Фоны')}
         <p class="tama-msg" id="tamaMsg"></p>
     `;
@@ -3822,7 +3911,7 @@ const TamaSound = (() => {
         try {
             if (species === 'dog') {
                 const bark = new Audio('/sounds/dog-bark-single.mp3');
-                bark.volume = 0.55;
+                bark.volume = 0.32; // было 0.55 — жаловались, что озвучка поглаживания слишком громкая
                 const playBark = () => {
                     try {
                         bark.currentTime = 0;
@@ -3840,9 +3929,9 @@ const TamaSound = (() => {
                 purr.play().catch(() => {});
                 let v = 0;
                 const fadeId = setInterval(() => {
-                    v = Math.min(0.5, v + 0.06);
+                    v = Math.min(0.28, v + 0.035); // было до 0.5 — тоже сделали тише
                     purr.volume = v;
-                    if (v >= 0.5) clearInterval(fadeId);
+                    if (v >= 0.28) clearInterval(fadeId);
                 }, 30);
                 purrNodes = { el: purr, fadeId };
             }
@@ -3880,7 +3969,7 @@ const TamaSound = (() => {
         // перезвон (triangle), больше похоже на приятный игровой "дзынь", а не
         // на писк калькулятора
         play()    { tone(523, 0, 0.09, 'triangle', 0.07); tone(659, 0.06, 0.09, 'triangle', 0.07); tone(784, 0.12, 0.13, 'triangle', 0.07); },
-        pet()     { tone(700, 0, 0.06, 'sine', 0.05); tone(880, 0.05, 0.09, 'sine', 0.05); },
+        pet()     { tone(700, 0, 0.06, 'sine', 0.03); tone(880, 0.05, 0.09, 'sine', 0.03); },
         purrStart, purrStop,
         sleep()   {
             // раньше — шумовое "дыхание", звучало резко/скребуще. Теперь

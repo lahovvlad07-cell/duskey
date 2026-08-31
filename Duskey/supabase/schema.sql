@@ -24,6 +24,7 @@ create table if not exists tamagotchi_pets (
   inventory            jsonb not null default '[]',   -- id купленных предметов магазина (аксессуары/фоны)
   equipped_accessory   text,                           -- id надетого аксессуара (или null)
   equipped_background  text,                           -- id выбранного фона сцены (или null)
+  equipped_furniture   text,                           -- id выбранной мебели под питомцем (или null)
   food                 jsonb not null default '{}',   -- { itemId: количество } — купленная еда, тратится по 1 за кормление
   toys                 jsonb not null default '{}',   -- { itemId: количество } — купленные игрушки, тратятся по 1 за игру
   last_pet_at          timestamptz,                    -- когда последний раз погладили (кулдаун награды за поглаживание)
@@ -42,6 +43,7 @@ alter table tamagotchi_pets add column if not exists last_daily_claim date;
 alter table tamagotchi_pets add column if not exists inventory jsonb not null default '[]';
 alter table tamagotchi_pets add column if not exists equipped_accessory text;
 alter table tamagotchi_pets add column if not exists equipped_background text;
+alter table tamagotchi_pets add column if not exists equipped_furniture text;
 alter table tamagotchi_pets add column if not exists food jsonb not null default '{}';
 alter table tamagotchi_pets add column if not exists toys jsonb not null default '{}';
 alter table tamagotchi_pets add column if not exists last_pet_at timestamptz;
