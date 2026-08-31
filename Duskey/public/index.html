@@ -330,8 +330,33 @@ mark {
 }
 .catalog-empty svg { width: 30px; height: 30px; color: var(--muted); opacity: 0.7; }
 
+/* --- фоновые "кружки"-подсветки по остальной странице --- раньше такой
+   декор был только один раз, в шапке (.hero-clip::before); ниже по
+   странице фон оставался совсем плоским. Приём тот же (радиальный
+   градиент, сам плавно гаснущий к прозрачности — доп. blur не нужен),
+   просто размещаем ещё пару штук у других секций, разных цветов/углов,
+   чтобы не читалось как копипаста одного и того же пятна. Обёртка со
+   своим overflow:hidden — отдельный элемент, а не сама секция, чтобы не
+   зацепить sticky-тулбар каталога (overflow:hidden на его предке сломал
+   бы sticky) */
+.section-glow-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.section-glow { position: absolute; border-radius: 50%; }
+.section-glow-coral {
+  top: -150px; left: -110px; width: 380px; height: 380px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--coral) 32%, transparent), transparent 70%);
+}
+.section-glow-accent-r {
+  top: -130px; right: -130px; width: 420px; height: 420px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%);
+}
+.section-glow-soft {
+  bottom: -120px; left: 50%; transform: translateX(-50%); width: 480px; height: 300px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent-deep) 20%, transparent), transparent 70%);
+}
+
 /* ---------- Quick-buy widget: the thing that greets you first ---------- */
-.quickbuy-section { padding: 18px 0 4px; }
+.quickbuy-section { padding: 18px 0 4px; position: relative; }
+.quickbuy-section > .container { position: relative; z-index: 1; }
 .quickbuy-card {
   position: relative;
   border-radius: var(--radius-lg);
@@ -356,6 +381,12 @@ mark {
   100% { box-shadow: var(--shadow), 0 0 0 0 transparent; }
 }
 .qb-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+/* обёртка полей режима "Купить" — display:contents, чтобы её дети
+   (qb-amounts/qb-row/qb-buy и т.п.) вели себя как прямые элементы
+   qb-body в обоих раскладках (мобильный flex и десктопный grid ниже),
+   а сама обёртка нужна только для того, чтобы одним style.display
+   скрыть/показать все эти поля разом при переключении режима */
+#qbBuyPanel { display: contents; }
 /* на планшете/десктопе даём каталогу ниже занять всю ширину контейнера
    (см. .catalog-grid), а сам виджет быстрой покупки — компактная форма,
    ей незачем растягиваться на всю ширину монитора, поэтому ограничиваем
@@ -381,8 +412,15 @@ mark {
   #qbAmountRow { grid-column: 1; grid-row: 3; align-self: start; }
   .qb-row { grid-column: 2; grid-row: 2; align-self: start; }
   #qbBuy { grid-column: 2; grid-row: 3; align-self: stretch; }
-  .qb-status { grid-column: 1 / 3; grid-row: 4; }
+  .qb-fee-note { grid-column: 1 / 3; grid-row: 4; }
+  .qb-status { grid-column: 1 / 3; grid-row: 5; }
 }
+
+/* курс/комиссия — маленькая расшифровка прямо у цены, а не только в
+   тексте оферты; тот же приём "видно в моменте", что и qb-seller-note */
+.qb-fee-note { font-size: 0.78rem; color: var(--muted); line-height: 1.4; margin: 0; }
+.qb-fee-note b { color: var(--ink-soft); }
+.qb-fee-note[hidden] { display: none; }
 
 /* "умный" блок над каталогом: поиск понял (точно или по нечёткому
    совпадению — опечатки вроде "телграм звды"), что искомое живёт в блоке
@@ -519,7 +557,8 @@ mark {
 .qb-status.is-error { color: var(--coral); }
 .qb-status.is-ok { color: var(--ink-soft); }
 
-.catalog-section { padding: 18px 0 56px; }
+.catalog-section { padding: 18px 0 56px; position: relative; }
+.catalog-section > .container { position: relative; z-index: 1; }
 /* ---------- Сетка каталога ----------
    Раньше была display:grid с колонками 1fr — при 7 товарах и 4 колонках
    последняя строка (3 карточки) прижималась влево, оставляя пустой
@@ -712,7 +751,8 @@ mark {
 }
 
 /* ---------- Footer — one slim row, no big cards/descriptions ---------- */
-.catalog-footer { border-top: 1px solid var(--line); padding: 14px 0; margin-top: 12px; }
+.catalog-footer { border-top: 1px solid var(--line); padding: 14px 0; margin-top: 12px; position: relative; }
+.catalog-footer > .container { position: relative; z-index: 1; }
 
 .footer-links {
   display: flex; align-items: center; justify-content: center;
@@ -920,6 +960,634 @@ mark {
 .pc-buy:hover { transform: translateY(-1px); }
 .pc-buy:active { transform: translateY(0) scale(0.98); }
 .pc-note { margin-top: 12px; font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.5; }
+
+/* ---------- Тамагочи: бонусный питомец (плавающая кнопка + панель) ---------- */
+.tama-card {
+  position: relative; border-radius: var(--radius-lg); border: 1px solid var(--line);
+  background: var(--surface); overflow: hidden; box-shadow: var(--shadow);
+  padding: 22px 18px 24px; animation: riseIn 0.5s var(--ease) both;
+}
+.tama-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--coral), var(--accent));
+}
+@media (min-width: 640px) { .tama-card { max-width: 520px; margin: 0 auto; padding: 26px 26px 28px; } }
+
+/* -- выбор питомца -- */
+.tama-picker-lead { font-size: 0.86rem; color: var(--ink-soft); line-height: 1.5; margin-bottom: 14px; text-align: center; }
+.tama-preview-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+.tama-preview-wrap .tama-pet { width: 104px; height: 104px; }
+.tama-pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tama-pick-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 14px 10px 12px; border-radius: var(--radius-md);
+  background: var(--surface-alt); border: 1px solid var(--line);
+  font-weight: 700; font-size: 0.88rem; color: var(--ink-soft);
+  transition: border-color 0.15s var(--ease), transform 0.15s var(--ease), color 0.15s var(--ease);
+}
+.tama-pick-card:hover { border-color: var(--accent); color: var(--ink); transform: translateY(-2px); }
+.tama-pick-card.is-active { border-color: var(--accent); color: var(--ink); background: var(--accent-tint); }
+.tama-pick-emoji { font-size: 26px; line-height: 1; }
+.tama-color-lead { font-size: 0.76rem; font-weight: 700; color: var(--muted); text-align: center; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.02em; }
+.tama-color-row { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; }
+.tama-color-swatch {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--swatch-color);
+  border: 2px solid transparent; position: relative; flex-shrink: 0;
+  transition: transform 0.15s var(--ease); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+}
+.tama-color-swatch:hover { transform: scale(1.1); }
+.tama-color-swatch.is-active::after {
+  content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid var(--swatch-color);
+}
+.tama-name-row { display: flex; gap: 8px; margin-top: 16px; }
+.tama-name-row[hidden] { display: none; }
+.tama-name-input {
+  flex: 1; min-height: 44px; padding: 0 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--line-strong); background: var(--surface-alt); color: var(--ink);
+  font-family: var(--font-body); font-size: 0.86rem;
+}
+.tama-name-input::placeholder { color: var(--muted); }
+.tama-name-input:focus { outline: none; border-color: var(--accent); }
+.tama-confirm-btn {
+  padding: 0 18px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.86rem;
+  background: linear-gradient(120deg, var(--accent) 0%, var(--accent-deep) 100%); color: #fff;
+  white-space: nowrap;
+}
+.tama-confirm-btn:active { transform: scale(0.97); }
+
+/* -- сцена с питомцем -- */
+.tama-stage {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 18px 0 8px; position: relative;
+}
+.tama-pet-name-row { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.tama-pet-name { font-weight: 700; font-size: 0.92rem; color: var(--ink); }
+.tama-recolor-btn {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; background: var(--surface-alt); border: 1px solid var(--line); color: var(--ink-soft); flex-shrink: 0;
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.tama-recolor-btn:hover { color: var(--ink); border-color: var(--accent); }
+.tama-recolor-panel { display: flex; justify-content: center; margin: 12px 0 -2px; }
+.tama-recolor-panel[hidden] { display: none; }
+.tama-pet { width: 128px; height: 128px; position: relative; }
+.tama-pet-shadow {
+  position: absolute; bottom: -4px; left: 50%; width: 70px; height: 12px;
+  background: rgba(0,0,0,0.18); border-radius: 50%; transform: translateX(-50%);
+  filter: blur(2px); transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+}
+/* сама зверушка — цельная SVG-иллюстрация (см. tamaPetSvg() в скрипте),
+   а не набор div'ов: раньше форма ушей/тела собиралась из абсолютно
+   спозиционированных прямоугольников в пикселях, из-за чего в маленьком
+   превью (карточки выбора) всё расползалось и переставало быть похожим
+   на кота/собаку — SVG со своим viewBox масштабируется корректно в любом
+   размере контейнера */
+.tama-pet-svg { width: 100%; height: 100%; display: block; animation: tamaBob 2.6s ease-in-out infinite; }
+@keyframes tamaBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* моргание — transform-box: fill-box нужен, чтобы scaleY схлопывался
+   вокруг центра именно самого глаза, а не левого верхнего угла viewBox */
+.tama-pet-svg .eye { transform-box: fill-box; transform-origin: center; animation: tamaBlink 4.4s ease-in-out infinite; }
+@keyframes tamaBlink { 0%, 90%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+
+/* уши (собака) — лёгкое покачивание для живости */
+.tama-pet-svg .pet-ear-l { transform-box: fill-box; transform-origin: top center; }
+.tama-pet-svg .pet-ear-r { transform-box: fill-box; transform-origin: top center; }
+.species-dog .tama-pet-svg .pet-ear-l { animation: tamaEarFlop 3.4s ease-in-out infinite; }
+.species-dog .tama-pet-svg .pet-ear-r { animation: tamaEarFlop 3.4s ease-in-out infinite 0.3s; }
+@keyframes tamaEarFlop { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(5deg); } }
+
+/* хвост — виляет мягко в спокойном состоянии, быстрее и шире в happy/play,
+   опускается в sad, замирает во сне */
+.tama-pet-svg .pet-tail { transform-box: fill-box; transform-origin: bottom left; animation: tamaTailWag 3.2s ease-in-out infinite; }
+@keyframes tamaTailWag { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(10deg); } }
+.tama-pet.mood-happy .tama-pet-svg .pet-tail,
+.tama-pet.mood-play .tama-pet-svg .pet-tail,
+.tama-pet.mood-eat .tama-pet-svg .pet-tail,
+.tama-pet.mood-pet .tama-pet-svg .pet-tail,
+.tama-pet.mood-pet-touch .tama-pet-svg .pet-tail { animation: tamaTailWagHappy 1s ease-in-out infinite; }
+@keyframes tamaTailWagHappy { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(24deg); } }
+.tama-pet.mood-sad .tama-pet-svg .pet-tail { animation: none; transform: rotate(-16deg); }
+.tama-pet.mood-sleep .tama-pet-svg .pet-tail { animation: none; transform: rotate(-2deg); }
+
+/* настроение — по данным о еде/бодрости/радости, или на секунду после
+   действия (покормить/поиграть/уложить спать). Мордочка нарисована как
+   несколько вариантов рта/глаз друг поверх друга в самом SVG — тут просто
+   переключаем, какой из них показать, а не перерисовываем форму */
+.tama-pet-svg .mouth-neutral, .tama-pet-svg .eyes-open { display: block; }
+.tama-pet-svg .mouth-happy, .tama-pet-svg .mouth-sad, .tama-pet-svg .mouth-sleep, .tama-pet-svg .mouth-eat, .tama-pet-svg .eyes-closed { display: none; }
+.tama-pet.mood-happy .tama-pet-svg .mouth-neutral { display: none; }
+.tama-pet.mood-happy .tama-pet-svg .mouth-happy { display: block; }
+.tama-pet.mood-sad .tama-pet-svg .mouth-neutral { display: none; }
+.tama-pet.mood-sad .tama-pet-svg .mouth-sad { display: block; }
+.tama-pet.mood-eat .tama-pet-svg .mouth-neutral { display: none; }
+.tama-pet.mood-eat .tama-pet-svg .mouth-eat { display: block; transform-box: fill-box; transform-origin: center; animation: tamaChomp 0.4s ease-in-out infinite; }
+.tama-pet.mood-pet .tama-pet-svg .mouth-neutral { display: none; }
+.tama-pet.mood-pet .tama-pet-svg .mouth-happy { display: block; }
+.tama-pet.mood-sleep .tama-pet-svg .mouth-neutral { display: none; }
+.tama-pet.mood-sleep .tama-pet-svg .mouth-sleep { display: block; }
+.tama-pet.mood-sleep .tama-pet-svg .eyes-open { display: none; }
+.tama-pet.mood-sleep .tama-pet-svg .eyes-closed { display: block; }
+.tama-pet.mood-sleep .tama-pet-svg { animation: tamaSleepBreathe 3.2s ease-in-out infinite; }
+.tama-pet.mood-sleep .tama-pet-shadow { opacity: 0.6; }
+@keyframes tamaChomp { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.6); } }
+@keyframes tamaSleepBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+.tama-pet.mood-play { animation: tamaJump 0.5s ease-in-out 2; }
+@keyframes tamaJump { 0%, 100% { transform: translateY(0) rotate(0); } 30% { transform: translateY(-16px) rotate(-8deg); } 60% { transform: translateY(0) rotate(6deg); } }
+/* глажка — питомец радостно подскакивает (не просто подрагивает), пока
+   его гладят свайпом, и один раз подпрыгивает, когда засчитывается сама
+   награда (mood-pet приходит с сервера/офлайн-стора через tamaDoAction) */
+.tama-pet.mood-pet .tama-pet-svg { animation: tamaPetHop 0.42s ease-in-out 2; }
+.tama-pet.mood-pet-touch .tama-pet-svg { animation: tamaPetHop 0.42s ease-in-out infinite; }
+.tama-pet.mood-pet-touch .tama-pet-svg .mouth-neutral, .tama-pet.mood-pet-touch .tama-pet-svg .mouth-sad { display: none; }
+.tama-pet.mood-pet-touch .tama-pet-svg .mouth-happy { display: block; }
+@keyframes tamaPetHop {
+  0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  35% { transform: translateY(-10px) scaleY(1.06) scaleX(0.96); }
+  60% { transform: translateY(0) scaleY(0.94) scaleX(1.05); }
+  80% { transform: translateY(-3px) scaleY(1.01) scaleX(0.99); }
+}
+/* аксессуар теперь нарисован внутри самого SVG (см. tamaAccessorySnippet
+   в скрипте), поэтому отдельно синхронизировать анимацию с ним больше не
+   нужно — он и так двигается вместе со всем спрайтом выше */
+
+/* глажка спящего питомца — можно погладить и во сне, но лицо должно
+   остаться "спящим" (закрытые глаза + сонный рот), а не показывать
+   одновременно улыбку И сонный рот поверх неё — раньше именно так и
+   было, потому что общий класс .mood-pet-touch включал mouth-happy, не
+   выключая при этом mouth-sleep от параллельного .mood-sleep. Поэтому
+   для сна используется отдельный класс sleep-purr, который НЕ трогает
+   рот/глаза вообще — только лёгкая дрожь тела, как будто мурлычет */
+.tama-pet.mood-sleep.sleep-purr .tama-pet-svg { animation: tamaSleepPurrShake 0.26s ease-in-out infinite; }
+@keyframes tamaSleepPurrShake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25% { transform: translateX(-1.6px) rotate(-0.6deg); }
+  75% { transform: translateX(1.6px) rotate(0.6deg); }
+}
+/* touch-action:none — жест поглаживания сам управляет скроллом/зумом на
+   тачскрине; user-select/-webkit-user-drag:none — без этого при быстром
+   боковом свайпе мышью браузер иногда распознаёт жест как выделение
+   текста/перетаскивание картинки прямо посреди поглаживания и обрывает
+   последовательность pointer-событий (pointercancel) раньше отпускания
+   кнопки — снаружи это выглядит как "сердечки вдруг перестали появляться" */
+.tama-pet-touch { cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
+.tama-heart-item { color: #ff6f91; }
+
+.tama-pet-fx { position: absolute; inset: -20px; pointer-events: none; overflow: visible; }
+.tama-fx-item {
+  position: absolute; left: 50%; top: 40%; font-size: 20px; transform: translate(-50%, 0);
+  animation: tamaFloatUp 1.1s ease-out forwards;
+}
+@keyframes tamaFloatUp { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -54px) scale(1.1); } }
+/* --- анимация кормления: раньше кусок еды просто взлетал вверх и таял,
+   как любой другой эффект — не читалось как "именно скормили". Теперь
+   еда стартует снизу (от руки/тарелки), едет вверх ко рту и там
+   уменьшается до нуля (проглочено), а не улетает мимо головы вверх */
+.tama-eat-item {
+  position: absolute; left: 50%; top: 82%; font-size: 22px; transform: translate(-50%, 0) scale(1) rotate(0deg);
+  animation: tamaEatTravel 0.85s cubic-bezier(0.3,0,0.6,1) forwards;
+}
+@keyframes tamaEatTravel {
+  0% { opacity: 0; top: 82%; transform: translate(-50%, 0) scale(0.9) rotate(-8deg); }
+  18% { opacity: 1; }
+  65% { top: 66%; transform: translate(-50%, 0) scale(1) rotate(6deg); }
+  100% { opacity: 0; top: 63%; transform: translate(-50%, 0) scale(0.15) rotate(10deg); }
+}
+/* --- "мысль" питомца — раньше всплывала строго над головой белым текстом
+   по белому фону в тёмной теме (var(--ink) в тёмной теме светлый, а фон был
+   жёстко #fff — отсюда нечитаемо); теперь фон/текст берутся из темы
+   (var(--surface)/var(--ink) — всегда контрастная пара). Раньше пузырь ещё
+   и был узкий (max-width 128px) и сидел сбоку от головы — короткие мысли
+   переносились на несколько строк и превращались в высокий "столбик"
+   вместо аккуратного облака. Теперь он центрирован над головой, вдвое шире
+   и низкий — текст в одну-две строки, а не в четыре */
+.tama-thought {
+  position: absolute; left: 50%; bottom: 100%; margin-bottom: 12px; z-index: 6;
+  transform: translate(-50%, 6px) scale(0.85); transform-origin: center bottom;
+  background: var(--surface); color: var(--ink); padding: 9px 16px; border-radius: 16px; font-size: 0.76rem; font-weight: 700;
+  width: max-content; max-width: min(260px, 72vw); white-space: normal; text-align: center; line-height: 1.3;
+  box-shadow: 0 10px 22px -10px rgba(0,0,0,0.4); border: 1.5px solid var(--line);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.tama-thought.is-visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.tama-thought::before, .tama-thought::after {
+  content: ''; position: absolute; left: 50%; background: var(--surface); border: 1.5px solid var(--line); border-radius: 50%;
+}
+.tama-thought::before { width: 10px; height: 10px; bottom: -15px; transform: translateX(-50%); }
+.tama-thought::after { width: 5px; height: 5px; bottom: -24px; transform: translateX(-70%); }
+.tama-zzz { position: absolute; right: 6px; top: 4px; font-weight: 800; font-family: var(--font-mono); color: var(--muted); pointer-events: none; }
+.tama-zzz span { position: absolute; animation: tamaZzz 2.6s ease-in infinite; opacity: 0; }
+.tama-zzz span:nth-child(1) { font-size: 12px; animation-delay: 0s; }
+.tama-zzz span:nth-child(2) { font-size: 15px; left: 8px; top: -8px; animation-delay: 0.6s; }
+.tama-zzz span:nth-child(3) { font-size: 18px; left: 16px; top: -18px; animation-delay: 1.2s; }
+@keyframes tamaZzz { 0% { opacity: 0; transform: translateY(0); } 25% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-20px); } }
+
+/* -- полоски состояния -- */
+.tama-stats { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.tama-stat { display: flex; align-items: center; gap: 10px; }
+.tama-stat-icon { width: 20px; text-align: center; font-size: 14px; flex-shrink: 0; }
+.tama-bar { flex: 1; height: 8px; border-radius: var(--radius-pill); background: var(--surface-alt); overflow: hidden; }
+.tama-bar-fill { height: 100%; border-radius: var(--radius-pill); transition: width 0.4s var(--ease); }
+.tama-bar-fill.satiety { background: linear-gradient(90deg, var(--coral), #ffb37a); }
+.tama-bar-fill.energy { background: linear-gradient(90deg, var(--accent), var(--accent-deep)); }
+.tama-bar-fill.happiness { background: linear-gradient(90deg, #6fd67e, #a3e6ac); }
+
+/* -- действия -- */
+.tama-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.tama-act-btn {
+  min-height: 44px; padding: 8px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.8rem;
+  background: var(--surface-alt); border: 1px solid var(--line); color: var(--ink);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  transition: border-color 0.15s var(--ease), transform 0.1s var(--ease);
+}
+.tama-act-btn:hover { border-color: var(--accent); }
+.tama-act-btn:active { transform: scale(0.96); }
+.tama-act-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.tama-act-btn[disabled]:active { transform: none; }
+.tama-msg { min-height: 1.2em; margin-top: 10px; font-size: 0.78rem; color: var(--muted); text-align: center; }
+
+/* -- плавающая кнопка -- */
+.tama-fab {
+  position: fixed; right: 18px; bottom: 18px; z-index: 60; width: 58px; height: 58px; border-radius: 50%;
+  background: linear-gradient(150deg, var(--surface-alt), var(--surface));
+  border: 1px solid var(--line-strong); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 14px 28px -14px rgba(0,0,0,0.5); animation: tamaFabFloat 3.6s ease-in-out infinite;
+  transition: transform 0.18s var(--ease);
+}
+.tama-fab:hover { transform: translateY(-2px) scale(1.05); }
+.tama-fab:active { transform: scale(0.94); }
+.tama-fab.is-open { animation: none; }
+@keyframes tamaFabFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.tama-fab-avatar { width: 42px; height: 42px; pointer-events: none; position: relative; }
+.tama-fab-avatar .tama-pet-svg { width: 100%; height: 100%; display: block; }
+.tama-fab-avatar .tama-zzz { transform: scale(0.5); right: -4px; top: -6px; }
+.tama-fab-ping {
+  position: absolute; top: 1px; right: 1px; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--coral); border: 2px solid var(--bg); animation: tamaPingPulse 1.6s ease-in-out infinite;
+}
+.tama-fab-ping[hidden] { display: none; }
+@keyframes tamaPingPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
+
+/* -- панель (bottom sheet на мобильном, поповер у кнопки на десктопе) -- */
+.tama-panel-overlay {
+  position: fixed; inset: 0; z-index: 61; background: rgba(6,7,16,0.5);
+  opacity: 0; transition: opacity 0.22s var(--ease);
+}
+.tama-panel-overlay[hidden] { display: none; }
+.tama-panel-overlay.is-visible { opacity: 1; }
+.tama-panel {
+  position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 440px;
+  max-height: min(88vh, 660px); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 22px 22px 0 0; box-shadow: 0 -18px 44px -20px rgba(0,0,0,0.55);
+  overflow-y: auto; overscroll-behavior: contain; transform: translateY(100%);
+  transition: transform 0.28s var(--ease); padding-bottom: 14px;
+}
+.tama-panel[hidden] { display: none; }
+.tama-panel.is-visible { transform: translateY(0); }
+.tama-panel-handle { width: 36px; height: 4px; border-radius: var(--radius-pill); background: var(--line-strong); margin: 10px auto 0; }
+@media (min-width: 640px) {
+  .tama-panel {
+    left: auto; right: 18px; bottom: 88px; border-radius: 20px;
+    transform: translateY(14px) scale(0.96); opacity: 0;
+    transition: transform 0.2s var(--ease), opacity 0.2s var(--ease);
+  }
+  .tama-panel.is-visible { transform: translateY(0) scale(1); opacity: 1; }
+  .tama-panel-handle { display: none; }
+}
+.tama-panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px 4px; }
+.tama-panel-title { flex: 1; font-size: 1.02rem; font-weight: 700; color: var(--ink); }
+.tama-panel-close {
+  width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); background: var(--surface-alt); flex-shrink: 0;
+}
+.tama-panel-close svg { width: 15px; height: 15px; }
+.tama-panel-close:hover { color: var(--ink); }
+.tama-panel .tama-card { border: none; box-shadow: none; border-radius: 0; margin: 0; padding: 8px 18px 10px; animation: none; }
+.tama-panel .tama-card::before { display: none; }
+
+/* --- вкладки Питомец/Магазин --- */
+.tama-tabs { display: flex; gap: 6px; padding: 0 18px 10px; }
+.tama-tabs[hidden] { display: none; }
+.tama-tab-btn {
+  flex: 1; padding: 8px 10px; border-radius: var(--radius-pill); border: 1.5px solid var(--line);
+  background: var(--surface-alt); color: var(--ink-soft); font-weight: 700; font-size: 0.82rem; cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.tama-tab-btn.is-active { background: var(--accent-tint); border-color: var(--accent); color: var(--ink); }
+
+/* --- шапка статуса: монеты / уровень / стрик --- */
+.tama-topbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.tama-chip {
+  display: flex; align-items: center; gap: 4px; font-size: 0.76rem; font-weight: 700; color: var(--ink-soft);
+  background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 4px 9px;
+}
+.tama-chip.coins { color: #b7791f; }
+.tama-chip.streak { color: var(--coral); }
+.tama-level-wrap { flex: 1; min-width: 96px; }
+.tama-level-row { display: flex; justify-content: space-between; font-size: 0.7rem; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
+.tama-xp-bar { height: 6px; border-radius: var(--radius-pill); background: var(--surface-alt); overflow: hidden; }
+.tama-xp-fill { height: 100%; border-radius: var(--radius-pill); background: linear-gradient(90deg, #a78bfa, #7c6cf0); transition: width 0.4s var(--ease); }
+.tama-ease-tag { font-size: 0.68rem; font-weight: 800; color: var(--accent-deep); }
+
+/* --- баннер ежедневной награды --- */
+.tama-daily-banner {
+  display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, var(--accent-tint), var(--surface-alt));
+  border: 1.5px dashed var(--accent); border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; cursor: pointer;
+  animation: tamaDailyPulse 1.8s ease-in-out infinite;
+}
+.tama-daily-banner[hidden] { display: none; }
+@keyframes tamaDailyPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,108,240,0.25); } 50% { box-shadow: 0 0 0 6px rgba(124,108,240,0); } }
+.tama-daily-emoji { font-size: 22px; flex-shrink: 0; }
+.tama-daily-text { flex: 1; font-size: 0.78rem; line-height: 1.35; color: var(--ink); }
+.tama-daily-text b { display: block; font-size: 0.85rem; }
+.tama-daily-go { font-size: 0.76rem; font-weight: 800; color: var(--accent-deep); flex-shrink: 0; }
+
+/* --- аксессуары на питомце ---
+   Раньше это была отдельная HTML-эмодзи-картинка, абсолютно
+   спозиционированная поверх SVG процентами — отсюда и ощущение "просто
+   висит в воздухе": не совпадала с ушами/глазами точно и не двигалась
+   вместе со спрайтом при анимациях. Теперь аксессуар нарисован ВНУТРИ
+   той же SVG-иллюстрации, координатами, снятыми с частей тела
+   (см. TAMA_ACC_POS/tamaAccessorySnippet в скрипте) — поэтому он и
+   совпадает с телом, и бесплатно наследует все анимации самого спрайта
+   (hop при глажке, дыхание во сне и т.д.), без отдельной синхронизации. */
+.tama-accessory { pointer-events: none; }
+.tama-accessory-bow, .tama-accessory-cap, .tama-accessory-crown, .tama-accessory-flower { filter: drop-shadow(0 1.5px 2px rgba(0,0,0,0.25)); }
+.tama-pet.mood-sleep .tama-accessory-glasses, .tama-pet.mood-sleep .tama-accessory-monocle { display: none; }
+
+/* --- фон сцены (косметика из магазина) ---
+   раньше это была одна плоская linear-gradient заливка; теперь у каждой
+   темы есть многослойный градиент плюс декоративные детали (солнце,
+   звёзды, холм, планета) через ::before/::after — без внешних картинок,
+   чистым CSS. Декор рисуется позади питомца (у .tama-pet свой z-index).
+   Земля/пол сцены у каждой темы — не плоская заливка, а замощённая
+   SVG-текстура (травинки на лугу и закате, силуэт травы на холме ночью,
+   кратеры на астероиде в космосе), поэтому "трава" реально выглядит как
+   трава, а не просто зелёный цвет. */
+.tama-stage { border-radius: 18px; transition: background 0.4s var(--ease); padding-top: 10px; }
+.tama-stage.has-bg { padding: 14px 0 4px; }
+.tama-stage.has-bg .tama-pet { position: relative; z-index: 2; }
+.tama-stage.has-bg::before, .tama-stage.has-bg::after { content: ''; position: absolute; pointer-events: none; z-index: 0; }
+
+.tama-stage[data-bg="bg_sunset"] { background: linear-gradient(180deg, #ffb199 0%, #ff9a76 40%, #ffd194 100%); }
+.tama-stage[data-bg="bg_sunset"]::before {
+  /* солнце у горизонта + пара тонких перистых облаков */
+  left: 0; right: 0; top: 0; height: 70%;
+  background-image:
+    radial-gradient(circle at 50% 30%, #fff6d6 0%, #ffd27a 35%, rgba(255,210,122,0) 55%),
+    radial-gradient(circle at 22% 18%, rgba(255,255,255,0.55) 0 5px, transparent 6px),
+    radial-gradient(circle at 28% 20%, rgba(255,255,255,0.5) 0 4px, transparent 5px),
+    radial-gradient(circle at 70% 12%, rgba(255,255,255,0.5) 0 4px, transparent 5px),
+    radial-gradient(circle at 76% 14%, rgba(255,255,255,0.45) 0 3px, transparent 4px);
+}
+.tama-stage[data-bg="bg_sunset"]::after {
+  /* поле под закатным светом — просто тёплая подсветка у горизонта, без
+     травинок (по фидбэку: трава в закате смотрелась лишней) */
+  left: -10%; right: -10%; bottom: 0; height: 34%;
+  background-image: linear-gradient(180deg, rgba(233,123,163,0) 0%, rgba(216,102,148,0.55) 100%);
+}
+
+.tama-stage[data-bg="bg_night"] {
+  /* база: звёздное небо + тёмный холм-силуэт снизу + еле заметная
+     трава на его гребне, всё — доп. слоями фона на самом .tama-stage,
+     чтобы не отнимать ::before/::after у звёзд и луны */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='40'%3E%3Cpath d='M3 40C4 28 1 20 3 6' stroke='%232a2f5c' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M9 40C10 28 7 20 9 6' stroke='%23232853' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M15 40C16 28 13 20 15 6' stroke='%23333a70' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M21 40C22 28 19 20 21 6' stroke='%231c2047' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M27 40C28 28 25 20 27 6' stroke='%232a2f5c' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M33 40C34 28 31 20 33 6' stroke='%23333a70' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"),
+    radial-gradient(130% 90% at 50% 100%, #222754 0%, #1c1f3d 60%, transparent 100%),
+    linear-gradient(180deg, #1c1f3d 0%, #2c2f5c 60%, #3c3470 100%);
+  background-repeat: repeat-x, no-repeat, no-repeat;
+  background-position: bottom, bottom, top;
+  background-size: 30px 34px, 100% 46%, 100% 100%;
+}
+.tama-stage[data-bg="bg_night"]::before {
+  inset: 0; border-radius: 18px; opacity: 0.85;
+  background-image:
+    radial-gradient(1.6px 1.6px at 18% 22%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 72% 15%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 46% 34%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 86% 46%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 10% 52%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 62% 62%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 30% 70%, #fff, transparent 100%);
+  animation: tamaTwinkle 3.6s ease-in-out infinite;
+}
+.tama-stage[data-bg="bg_night"]::after {
+  right: 16%; top: 12%; width: 30px; height: 30px; border-radius: 50%; background: #f5f0dd;
+  box-shadow: inset -8px -2px 0 0 #2c2f5c, 0 0 16px 2px rgba(245,240,221,0.45);
+}
+@keyframes tamaTwinkle { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; } }
+
+.tama-stage[data-bg="bg_space"] {
+  /* база: глубокий космос + пара цветных туманностей + кратерная
+     "почва" астероида снизу вместо плоской заливки */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Ccircle cx='10' cy='14' r='4' fill='none' stroke='%235a4a8a' stroke-width='1.2' opacity='0.5'/%3E%3Ccircle cx='30' cy='8' r='2.5' fill='none' stroke='%236b5a9e' stroke-width='1' opacity='0.4'/%3E%3Ccircle cx='40' cy='30' r='5' fill='none' stroke='%23453a70' stroke-width='1.3' opacity='0.5'/%3E%3Ccircle cx='15' cy='38' r='3' fill='none' stroke='%235a4a8a' stroke-width='1' opacity='0.4'/%3E%3C/svg%3E"),
+    radial-gradient(130% 90% at 50% 100%, #34285e 0%, #241a45 55%, transparent 100%),
+    radial-gradient(160px 120px at 18% 66%, rgba(124,58,237,0.32), transparent 65%),
+    radial-gradient(170px 130px at 84% 74%, rgba(59,130,246,0.26), transparent 65%),
+    linear-gradient(180deg, #0c0c22 0%, #241a45 55%, #3a2266 100%);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position: bottom, bottom, top, top, top;
+  background-size: 50px 50px, 100% 50%, 100% 100%, 100% 100%, 100% 100%;
+}
+.tama-stage[data-bg="bg_space"]::before {
+  inset: 0; border-radius: 18px; opacity: 0.9;
+  background-image:
+    radial-gradient(1.6px 1.6px at 14% 18%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 38% 10%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 60% 26%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 82% 14%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 92% 40%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 22% 46%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 50% 58%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 76% 66%, #fff, transparent 100%);
+  animation: tamaTwinkle 3s ease-in-out infinite;
+}
+.tama-stage[data-bg="bg_space"]::after {
+  left: 12%; bottom: 20%; width: 24px; height: 24px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffb199, #7c3aed 75%);
+  box-shadow: 0 0 14px 2px rgba(167,139,250,0.55);
+}
+
+.tama-stage[data-bg="bg_aurora"] {
+  /* глубокое северное небо + несколько волнистых лент полярного сияния
+     (вытянутые радиальные пятна под разными точками схода, как шторы
+     разных оттенков), силуэт гор внизу — в ::after */
+  background-image:
+    radial-gradient(60% 140% at 20% -10%, rgba(88,255,183,0.4), transparent 62%),
+    radial-gradient(55% 160% at 46% -20%, rgba(124,58,237,0.32), transparent 58%),
+    radial-gradient(55% 150% at 74% -8%, rgba(56,189,248,0.34), transparent 60%),
+    radial-gradient(130% 90% at 50% 100%, #0d1730 0%, #0a1226 60%, transparent 100%),
+    linear-gradient(180deg, #060a1c 0%, #0d1730 55%, #142248 100%);
+  background-repeat: no-repeat;
+  background-position: top, top, top, bottom, top;
+  background-size: 100% 72%, 100% 72%, 100% 72%, 100% 55%, 100% 100%;
+}
+.tama-stage[data-bg="bg_aurora"]::before {
+  inset: 0; border-radius: 18px; opacity: 0.9;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 14%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 34% 8%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 58% 20%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 80% 10%, #fff, transparent 100%),
+    radial-gradient(1.6px 1.6px at 90% 34%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 20% 40%, #fff, transparent 100%);
+  animation: tamaTwinkle 4.2s ease-in-out infinite;
+}
+.tama-stage[data-bg="bg_aurora"]::after {
+  left: 0; right: 0; bottom: 0; height: 20%; background: #0a0e1e;
+  clip-path: polygon(0% 100%, 0% 60%, 9% 42%, 20% 60%, 32% 32%, 45% 56%, 57% 24%, 69% 50%, 81% 36%, 92% 54%, 100% 40%, 100% 100%);
+}
+
+/* --- магазин --- */
+.tama-shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 4px; }
+.tama-shop-item {
+  position: relative; border: 1.5px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  min-width: 0;
+}
+.tama-shop-item.is-equipped { border-color: var(--accent); background: var(--accent-tint); }
+.tama-shop-emoji { font-size: 30px; }
+.tama-shop-name { font-size: 0.78rem; font-weight: 700; color: var(--ink); overflow-wrap: break-word; word-break: break-word; max-width: 100%; }
+.tama-shop-price { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+.tama-shop-lock { font-size: 0.68rem; color: var(--coral); font-weight: 700; }
+.tama-shop-btn {
+  margin-top: 4px; width: 100%; border: none; border-radius: var(--radius-pill); padding: 6px 6px; font-size: 0.7rem;
+  font-weight: 800; cursor: pointer; background: var(--accent); color: #fff; transition: transform 0.15s var(--ease), opacity 0.15s var(--ease);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tama-shop-btn:active { transform: scale(0.95); }
+.tama-shop-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.tama-shop-btn.is-owned { background: var(--surface-alt); color: var(--ink-soft); }
+.tama-shop-btn.is-equipped-btn { background: var(--coral); }
+.tama-shop-price-old { opacity: 0.6; font-weight: 600; margin-right: 2px; }
+.tama-shop-section-title { font-size: 0.76rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; margin: 14px 0 8px; }
+.tama-shop-section-title:first-child { margin-top: 0; }
+.tama-shop-count { font-weight: 700; color: var(--accent-deep); }
+
+/* --- мини-превью фона прямо в карточке магазина — раньше там была одна
+   плоская эмодзи, и по ней совершенно не было видно, как фон выглядит на
+   самом деле (а он на сцене отрисован куда детальнее); теперь карточка
+   показывает уменьшенную, но узнаваемую версию того же арта --- */
+.tama-shop-bg-preview { position: relative; display: block; width: 100%; height: 46px; border-radius: 10px; overflow: hidden; }
+.tama-shop-bg-preview[data-bg="bg_sunset"] {
+  background:
+    radial-gradient(circle at 50% 55%, #fff6d6 0%, #ffd27a 30%, rgba(255,210,122,0) 50%),
+    linear-gradient(180deg, #ffb199 0%, #ff9a76 45%, #ffd194 100%);
+}
+.tama-shop-bg-preview[data-bg="bg_night"] {
+  background:
+    radial-gradient(1.2px 1.2px at 20% 30%, #fff, transparent 100%),
+    radial-gradient(1px 1px at 70% 20%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 45% 45%, #fff, transparent 100%),
+    radial-gradient(1px 1px at 85% 55%, #fff, transparent 100%),
+    radial-gradient(9px 9px at 74% 32%, #f5f0dd 60%, transparent 62%),
+    linear-gradient(180deg, #1c1f3d 0%, #2c2f5c 60%, #3c3470 100%);
+}
+.tama-shop-bg-preview[data-bg="bg_space"] {
+  background:
+    radial-gradient(1.2px 1.2px at 18% 24%, #fff, transparent 100%),
+    radial-gradient(1px 1px at 60% 18%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 82% 40%, #fff, transparent 100%),
+    radial-gradient(1px 1px at 34% 55%, #fff, transparent 100%),
+    radial-gradient(60px 44px at 22% 70%, rgba(124,58,237,0.4), transparent 65%),
+    radial-gradient(60px 44px at 80% 78%, rgba(59,130,246,0.32), transparent 65%),
+    linear-gradient(180deg, #0c0c22 0%, #241a45 55%, #3a2266 100%);
+}
+.tama-shop-bg-preview[data-bg="bg_aurora"] {
+  background:
+    radial-gradient(1.2px 1.2px at 22% 20%, #fff, transparent 100%),
+    radial-gradient(1px 1px at 66% 14%, #fff, transparent 100%),
+    radial-gradient(1.2px 1.2px at 84% 34%, #fff, transparent 100%),
+    radial-gradient(70% 130% at 18% -20%, rgba(88,255,183,0.45), transparent 62%),
+    radial-gradient(65% 150% at 48% -30%, rgba(124,58,237,0.36), transparent 58%),
+    radial-gradient(65% 140% at 76% -16%, rgba(56,189,248,0.38), transparent 60%),
+    linear-gradient(180deg, #060a1c 0%, #0d1730 55%, #142248 100%);
+}
+
+/* --- редкость товара (чисто визуальная рамка/подпись) --- */
+.tama-shop-item[data-rarity="rare"] { border-color: #5fa3e6; }
+.tama-shop-item[data-rarity="epic"] { border-color: #9280eb; box-shadow: 0 0 0 1px rgba(146,128,235,0.25) inset; }
+.tama-shop-item[data-rarity="legendary"] { border-color: #e6a23c; box-shadow: 0 0 14px -4px rgba(230,162,60,0.55); }
+.tama-shop-item[data-rarity="legendary"] .tama-shop-emoji { filter: drop-shadow(0 0 6px rgba(230,162,60,0.65)); }
+.tama-shop-item[data-rarity="legendary"] .tama-shop-bg-preview { box-shadow: 0 0 10px -2px rgba(230,162,60,0.7) inset; }
+.tama-shop-rarity {
+  position: absolute; top: 6px; right: 8px; font-size: 0.58rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.03em; opacity: 0.7; z-index: 2;
+}
+.tama-rarity-rare { color: #5fa3e6; }
+.tama-rarity-epic { color: #9280eb; }
+.tama-rarity-legendary { color: #e6a23c; }
+
+/* --- бейдж "товар дня" в магазине --- */
+.tama-shop-item.is-deal { border-color: #ff6f91; }
+.tama-shop-deal-badge {
+  position: absolute; top: -8px; left: 8px; background: linear-gradient(120deg, #ff6f91, #ff9a56); color: #fff;
+  font-size: 0.6rem; font-weight: 800; padding: 3px 7px; border-radius: 8px; box-shadow: 0 3px 8px -3px rgba(255,111,145,0.6);
+  z-index: 2;
+}
+.tama-deal-banner {
+  display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(255,111,145,0.14), var(--surface-alt));
+  border: 1.5px dashed #ff6f91; border-radius: 14px; padding: 10px 12px; margin-bottom: 14px;
+}
+.tama-deal-banner .tama-daily-text b { display: block; font-size: 0.85rem; color: var(--ink); }
+
+/* --- выбор еды/игрушки из инвентаря при кормлении/игре --- */
+.tama-item-picker {
+  display: flex; flex-direction: column; gap: 6px; margin-top: 0; overflow: hidden;
+  max-height: 0; opacity: 0; pointer-events: none;
+  transition: max-height 0.32s var(--ease), opacity 0.22s var(--ease), margin-top 0.32s var(--ease);
+}
+.tama-item-picker.is-open { max-height: 600px; opacity: 1; pointer-events: auto; margin-top: 10px; }
+.tama-item-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; border: 1.5px solid var(--line);
+  background: var(--surface-alt); cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ink); text-align: left;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.tama-item-row:hover { background: var(--accent-tint); border-color: var(--accent); }
+.tama-item-row:active { transform: scale(0.98); }
+.tama-item-emoji { font-size: 20px; flex-shrink: 0; }
+.tama-item-name { flex: 1; }
+.tama-item-count { font-size: 0.74rem; color: var(--muted); font-weight: 700; }
+
+/* --- праздник за левелап --- */
+.tama-levelup-overlay {
+  position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center;
+  background: rgba(20,16,32,0.45); opacity: 0; pointer-events: none; transition: opacity 0.25s var(--ease);
+}
+.tama-levelup-overlay.is-visible { opacity: 1; pointer-events: auto; }
+.tama-levelup-card {
+  background: var(--surface); border-radius: 22px; padding: 28px 30px; text-align: center; max-width: 260px;
+  transform: scale(0.7); transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,0.4);
+}
+.tama-levelup-overlay.is-visible .tama-levelup-card { transform: scale(1); }
+.tama-levelup-emoji { font-size: 52px; animation: tamaLevelSpin 0.9s ease-in-out; }
+@keyframes tamaLevelSpin { 0% { transform: scale(0) rotate(-30deg); } 60% { transform: scale(1.15) rotate(10deg); } 100% { transform: scale(1) rotate(0); } }
+.tama-levelup-title { font-size: 1.2rem; font-weight: 800; color: var(--ink); margin: 10px 0 4px; }
+.tama-levelup-sub { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 16px; }
+.tama-levelup-close {
+  border: none; border-radius: var(--radius-pill); padding: 9px 22px; font-weight: 800; font-size: 0.85rem;
+  background: var(--accent); color: #fff; cursor: pointer;
+}
+.tama-confetti-piece {
+  position: fixed; top: -20px; font-size: 20px; z-index: 10002; pointer-events: none;
+  animation: tamaConfettiFall linear forwards;
+}
+@keyframes tamaConfettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(340deg); opacity: 0; } }
+
+/* --- тост (стрик/покупка/итд) --- */
+.tama-toast {
+  /* фон/текст берутся из пары ink/bg, а не из ink/#fff — раньше в тёмной
+     теме var(--ink) сам был светлым, и получался почти-белый текст на
+     почти-белом фоне (например в тосте ежедневной награды «+N монет»);
+     теперь пара всегда инвертируется вместе с темой и остаётся контрастной */
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); z-index: 10003;
+  background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: var(--radius-pill); font-size: 0.82rem;
+  font-weight: 700; opacity: 0; transition: opacity 0.25s var(--ease), transform 0.25s var(--ease); pointer-events: none;
+  box-shadow: 0 14px 30px -10px rgba(0,0,0,0.4); max-width: 86vw; text-align: center;
+}
+.tama-toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -945,7 +1613,7 @@ mark {
                     <span class="brand-name">Duskey</span>
                 </div>
                 <div class="top-actions">
-                    <a class="tg-pill" href="https://t.me/Duskey_Shop" target="_blank" rel="noopener">
+                    <a class="tg-pill" href="https://t.me/duskey_market" target="_blank" rel="noopener">
                         <svg viewBox="0 0 240 240" fill="currentColor" stroke="none"><path d="M120 0a120 120 0 1 0 0 240 120 120 0 0 0 0-240zm55.6 81.7-18.7 88.2c-1.4 6.3-5.1 7.9-10.3 4.9l-28.5-21-13.7 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2l-65.1 41-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9l109.8-42.3c5.1-1.9 9.6 1.2 7.9 8.7z"/></svg>
                         <span class="tg-pill-label">Канал в Telegram</span>
                     </a>
@@ -980,6 +1648,7 @@ mark {
 </header>
 
 <section class="quickbuy-section" id="quickbuySection">
+    <div class="section-glow-wrap"><span class="section-glow section-glow-coral"></span></div>
     <div class="container">
         <div class="section-head">
             <div>
@@ -991,17 +1660,20 @@ mark {
         <div class="quickbuy-card">
             <div class="qb-body">
                 <div class="qb-tabs" id="qbTabs"></div>
-                <div class="qb-amounts" id="qbAmounts"></div>
-                <div class="qb-amount-row" id="qbAmountRow">
-                    <input type="text" inputmode="numeric" class="qb-amount-input" id="qbAmountInput">
-                    <span class="qb-amount-suffix" id="qbAmountSuffix"></span>
-                </div>
-                <div class="qb-row">
-                    <div class="qb-input-wrap" id="qbInputWrap">
-                        <input type="text" class="qb-input" id="qbInput" placeholder="">
+                <div id="qbBuyPanel">
+                    <div class="qb-amounts" id="qbAmounts"></div>
+                    <div class="qb-amount-row" id="qbAmountRow">
+                        <input type="text" inputmode="numeric" class="qb-amount-input" id="qbAmountInput">
+                        <span class="qb-amount-suffix" id="qbAmountSuffix"></span>
                     </div>
+                    <div class="qb-row">
+                        <div class="qb-input-wrap" id="qbInputWrap">
+                            <input type="text" class="qb-input" id="qbInput" placeholder="">
+                        </div>
+                    </div>
+                    <button type="button" class="qb-buy" id="qbBuy">Купить</button>
                 </div>
-                <button type="button" class="qb-buy" id="qbBuy">Купить</button>
+                <p class="qb-fee-note" id="qbFeeNote" hidden></p>
                 <p class="qb-status" id="qbStatus" aria-live="polite"></p>
             </div>
         </div>
@@ -1009,6 +1681,7 @@ mark {
 </section>
 
 <section class="catalog-section">
+    <div class="section-glow-wrap"><span class="section-glow section-glow-accent-r"></span></div>
     <div class="container">
         <div class="section-head">
             <div>
@@ -1050,6 +1723,7 @@ mark {
 </section>
 
 <footer class="catalog-footer">
+    <div class="section-glow-wrap"><span class="section-glow section-glow-soft"></span></div>
     <div class="container">
         <div class="footer-links">
             <button type="button" class="footer-link" id="policiesBtn">
@@ -1060,7 +1734,7 @@ mark {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
                 <span>Поддержка</span>
             </a>
-            <a class="footer-link" href="https://t.me/Duskey_Shop" target="_blank" rel="noopener">
+            <a class="footer-link" href="https://t.me/duskey_market" target="_blank" rel="noopener">
                 <svg viewBox="0 0 240 240" fill="currentColor" stroke="none"><path d="M120 0a120 120 0 1 0 0 240 120 120 0 0 0 0-240zm55.6 81.7-18.7 88.2c-1.4 6.3-5.1 7.9-10.3 4.9l-28.5-21-13.7 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2l-65.1 41-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9l109.8-42.3c5.1-1.9 9.6 1.2 7.9 8.7z"/></svg>
                 <span>Сообщество</span>
             </a>
@@ -1100,72 +1774,56 @@ mark {
 <template id="tpl-offer">
 <div class="legal-doc">
     <h1>Публичная оферта</h1>
-    <p class="meta">Редакция от 29 августа 2026 г.</p>
-    <div class="notice"><b>На Сайте два разных режима, и у них разный продавец.</b> «Пополнение Steam» — прямая продажа: продавец — Владелец Сайта (реквизиты — п. 8), оплата принимается через сторонний платёжный сервис Digiseller. Остальные товары каталога (Telegram Premium/Stars, Spotify, Claude AI, ChatGPT, Robux и т.п.) — Сайт выступает партнёром/агентом Digiseller: продавцом по сделке является тот, кто зарегистрировал конкретный товар на Digiseller/Plati.Market, а не Владелец Сайта. Ниже подробно разделено, что относится к какому режиму.</div>
+    <p class="meta">Редакция от 30 августа 2026 г.</p>
+    <div class="notice"><b>Сайт не продаёт ни один товар каталога напрямую — включая «Пополнение Steam».</b> По каждой позиции каталога Владелец Сайта выступает исключительно партнёром/агентом платформы Digiseller (она же Plati.Market): продавцом по сделке всегда является лицо, зарегистрированное продавцом конкретного товара на Digiseller. Владелец Сайта оплату не принимает, товар не хранит и не выдаёт, а получает только партнёрское вознаграждение за переходы и покупки по своим ссылкам.</div>
 
     <h2>1. Термины</h2>
-    <p><b>Сайт</b> — Duskey и связанный с ним сервер. <b>Владелец Сайта</b> — лицо, указанное в реквизитах (п. 8). <b>Пользователь</b> — любое лицо, использующее Сайт. <b>Каталог</b> — витрина товаров Сайта. <b>Digiseller</b> — сторонняя платформа цифровых товаров (она же Plati.Market), через страницу которой Пользователь оплачивает заказ и получает товар. <b>Партнёрский товар</b> — товар каталога, продавцом которого на Digiseller является третье лицо, а не Владелец Сайта; Владелец Сайта в этом случае действует как партнёр Digiseller (агент) и получает вознаграждение за переходы/покупки по своей партнёрской ссылке.</p>
-    <p>Начиная использовать Сайт, Пользователь подтверждает, что ознакомился с условиями настоящей оферты и принимает их в полном объёме. В части раздела «Пополнение Steam» нажатие кнопки «Купить» и переход к оплате означает акцепт настоящей оферты и заключение договора между Пользователем и Владельцем Сайта.</p>
+    <p><b>Сайт</b> — Duskey и связанный с ним сервер. <b>Владелец Сайта</b> — лицо, администрирующее Сайт как партнёрскую витрину (контакты — п. 8); стороной ни одного договора купли-продажи товаров каталога не является. <b>Пользователь</b> — любое лицо, использующее Сайт. <b>Каталог</b> — витрина товаров Сайта, включая «Пополнение Steam». <b>Digiseller</b> — сторонняя платформа цифровых товаров (она же Plati.Market), на странице которой Пользователь оформляет заказ, оплачивает его и получает товар по любой позиции каталога.</p>
+    <p>Начиная использовать Сайт, Пользователь подтверждает, что ознакомился с условиями настоящей оферты и принимает их в полном объёме.</p>
 
-    <h2>2. Пополнение Steam: предмет и продавец</h2>
-    <p>Продавец услуги пополнения Steam — Владелец Сайта (реквизиты — п. 8). Оплата принимается на защищённой странице стороннего платёжного сервиса Digiseller, который обрабатывает платёж и техническую доставку по поручению Владельца Сайта; Digiseller в этой части не является самостоятельным продавцом.</p>
+    <h2>2. Роль Сайта</h2>
+    <p>По всем товарам каталога без исключения (Пополнение Steam, Telegram Premium/Stars, Spotify, Claude AI, ChatGPT, Robux и др.) Владелец Сайта размещает партнёрские ссылки на товары, зарегистрированные продавцами на Digiseller/Plati.Market, и получает от Digiseller партнёрское вознаграждение за переходы и покупки по этим ссылкам. Владелец Сайта товар не производит, не приобретает и не предоставляет, оплату Пользователей не принимает, денежные средства не получает, не хранит и не выдаёт.</p>
 
-    <h2>3. Пополнение Steam: порядок оформления и оплаты</h2>
+    <h2>3. Продавец по сделке</h2>
+    <p>Стороной договора купли-продажи по любому товару каталога является продавец, зарегистрированный на Digiseller как владелец конкретного товара, — не Владелец Сайта. Какой именно продавец стоит за товаром, указано на странице оплаты Digiseller при переходе по ссылке.</p>
+
+    <h2>4. Порядок оформления и оплаты</h2>
     <ol>
-        <li>Пользователь нажимает «Купить» на карточке «Пополнение Steam» и переходит на страницу оплаты Digiseller.</li>
-        <li>На странице Digiseller Пользователь указывает логин Steam-аккаунта, сумму пополнения и оплачивает заказ выбранным способом.</li>
-        <li>Договор считается заключённым и исполненным Владельцем Сайта с момента поступления оплаты и подтверждения зачисления средств на Steam-аккаунт.</li>
-        <li>Ответственность за правильность указанного логина Steam несёт Пользователь — ошибочно указанный логин может сделать зачисление невозможным или необратимым.</li>
-    </ol>
-
-    <h2>4. Остальной каталог: роль Сайта</h2>
-    <p>По всем прочим товарам каталога (Telegram Premium, Telegram Stars, подписки Spotify/Claude AI/ChatGPT, Robux и др.) Владелец Сайта размещает партнёрские ссылки на товары, принадлежащие другим продавцам, зарегистрированным на Digiseller/Plati.Market, и получает агентское вознаграждение за переходы и покупки по этим ссылкам. Какой конкретно продавец стоит за товаром, указано на странице оплаты Digiseller при переходе.</p>
-
-    <h2>5. Остальной каталог: продавец по сделке</h2>
-    <p>Стороной договора купли-продажи такого товара является продавец, зарегистрированный на Digiseller как владелец конкретного товара, — не Владелец Сайта. Приём платежа, формирование чека и передача товара выполняются силами Digiseller и/или этого продавца. Владелец Сайта деньги за эти товары не получает, не хранит и не выдаёт — только партнёрское вознаграждение от Digiseller.</p>
-    <ol>
-        <li>Пользователь выбирает товар на Сайте и переходит по партнёрской ссылке на страницу оплаты Digiseller, где и происходит оформление, оплата и получение товара.</li>
+        <li>Пользователь выбирает товар на Сайте и переходит по партнёрской ссылке на страницу оплаты Digiseller.</li>
+        <li>На странице Digiseller Пользователь указывает необходимые для доставки данные (например, логин Steam-аккаунта или username Telegram — в зависимости от товара), выбирает способ оплаты и оплачивает заказ.</li>
         <li>Договор считается заключённым между Пользователем и продавцом на Digiseller с момента поступления оплаты; Сайт стороной этого договора не становится.</li>
-        <li>Цены на Сайте указаны справочно и могут отличаться от суммы на странице оплаты — окончательная цена та, что показана перед оплатой на Digiseller.</li>
+        <li>Цены на Сайте (включая расчёт в разделе «Быстрая покупка») указаны справочно и могут отличаться от суммы на странице оплаты — окончательная цена та, что показана перед оплатой на Digiseller.</li>
+        <li>Ответственность за правильность указанных при оплате данных (логина, username и т. п.) несёт Пользователь — ошибка может сделать доставку товара невозможной или необратимой.</li>
     </ol>
 
-    <h2>6. Доставка / исполнение</h2>
-    <p>По всем позициям (и Steam, и остальной каталог) выдача цифрового товара и кассового чека происходит на странице/в личном кабинете Digiseller сразу после подтверждения оплаты, обычно в течение нескольких минут (иногда — до 24 часов для отдельных позиций). Статус заказа и чек доступны в личном кабинете покупателя на digiseller.market/plati.market.</p>
+    <h2>5. Доставка / исполнение</h2>
+    <p>По любой позиции каталога выдача цифрового товара и кассового чека происходит на странице/в личном кабинете Digiseller сразу после подтверждения оплаты, обычно в течение нескольких минут (иногда — до 24 часов для отдельных позиций). Статус заказа и чек доступны в личном кабинете покупателя на digiseller.market/plati.market.</p>
 
-    <h2>7. Ответственность</h2>
-    <p>Сайт предоставляется «как есть». В части «Пополнения Steam» (п. 2–3) Владелец Сайта отвечает за исполнение услуги в пределах, установленных применимым законодательством о защите прав потребителей, но не отвечает за технические сбои на стороне Digiseller как платёжного оператора. В части остального каталога (п. 4–5) Владелец Сайта не принимает оплату, не хранит и не выдаёт товар и не отвечает за его качество, сроки доставки, а также за действия продавца на Digiseller — претензии направляются этому продавцу или в поддержку Digiseller. Ни в одном из режимов Владелец Сайта не отвечает за работоспособность сервисов конечных площадок (Steam/Valve, Telegram, Spotify, Roblox и т.п.).</p>
+    <h2>6. Ответственность</h2>
+    <p>Сайт предоставляется «как есть». Владелец Сайта не принимает оплату, не хранит и не выдаёт товар и не отвечает за его качество, сроки доставки, а также за действия продавца на Digiseller — претензии по любому товару направляются продавцу на Digiseller или в поддержку Digiseller. Владелец Сайта не отвечает за работоспособность сервисов конечных площадок (Steam/Valve, Telegram, Spotify, Roblox и т. п.) и платёжного оператора Digiseller.</p>
 
-    <h2>8. Реквизиты продавца (раздел «Пополнение Steam»)</h2>
+    <h2>7. Возврат и обмен</h2>
+    <p>Правила возврата подробно описаны в отдельном документе «<button type="button" class="doc-link" data-doc="refund">Возврат и обмен</button>» — по любому товару возврат оформляется через Digiseller или продавца на Digiseller, Сайт стороной возврата не является.</p>
+
+    <h2>8. Статус Сайта и контакты</h2>
     <div class="req">
-        <p><b>⚠️ Заполнить перед публикацией сайта.</b> Ниже — реальные данные лица, зарегистрированного в Digiseller как продавец услуги пополнения Steam.</p>
-        <p><b>Наименование:</b> [ИП/Самозанятый/ООО — укажите полное наименование]</p>
-        <p><b>ИНН:</b> [укажите] &nbsp; <b>ОГРН/ОГРНИП:</b> [укажите, если применимо]</p>
-        <p><b>Юридический/фактический адрес:</b> [укажите]</p>
-        <p><b>Контакт для претензий:</b> [email или телефон]</p>
+        <p>Владелец Сайта не является продавцом ни по одной позиции каталога и не указывает здесь собственные реквизиты как продавца — стороной сделки, оператором платежа и лицом, определяющим правила оплаты/доставки/возврата, выступает Digiseller (он же Plati.Market). Актуальные юридические реквизиты Digiseller и Plati.Market опубликованы в их собственном пользовательском соглашении и оферте на digiseller.market / plati.market.</p>
+        <p><b>Поддержка Сайта (по вопросам работы витрины, не по заказам):</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
     </div>
 
-    <h2>9. Возврат и обмен</h2>
-    <p>Правила возврата подробно описаны в отдельном документе «<button type="button" class="doc-link" data-doc="refund">Возврат и обмен</button>» — для каждого режима они разные.</p>
-
-    <h2>10. Изменение условий</h2>
+    <h2>9. Изменение условий</h2>
     <p>Владелец Сайта вправе изменять настоящую оферту в любое время без отдельного уведомления. Актуальная редакция всегда доступна на этой странице; продолжение использования Сайта означает согласие с изменениями.</p>
-
-    <h2>11. Контакты</h2>
-    <div class="req">
-        <p><b>Поддержка Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
-    </div>
 </div>
 </template>
 
 <template id="tpl-privacy">
 <div class="legal-doc">
     <h1>Политика конфиденциальности</h1>
-    <p class="meta">Редакция от 29 августа 2026 г.</p>
-    <div class="notice">Сайт сам почти не собирает персональных данных: при оформлении любого заказа Пользователь вводит логин/username, email и данные оплаты напрямую на защищённой странице Digiseller, а не на Сайте — см. п. 2.</div>
+    <p class="meta">Редакция от 30 августа 2026 г.</p>
+    <div class="notice">Сайт сам почти не собирает персональных данных: при оформлении любого заказа Пользователь вводит логин/username, email и данные оплаты напрямую на защищённой странице Digiseller, а не на Сайте — см. п. 3.</div>
 
     <h2>1. Общие положения</h2>
-
-    <p>Настоящая Политика (далее — «Политика») определяет порядок обработки персональных данных Пользователей на сайте Duskey (далее — «Сайт») в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных». Оператором персональных данных, обрабатываемых Сайтом самостоятельно (п. 2), является Владелец Сайта — реквизиты см. в п. 8.</p>
+    <p>Настоящая Политика (далее — «Политика») определяет порядок обработки персональных данных Пользователей на сайте Duskey (далее — «Сайт») в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных». Сайт не является продавцом ни по одной позиции каталога (см. «Публичную оферту») и не участвует в обработке данных заказа и оплаты — это делает Digiseller, см. п. 3–4. Сайт как техническая площадка самостоятельно собирает только минимальные технические данные, перечисленные в п. 2.</p>
 
     <h2>2. Данные при обычном просмотре</h2>
     <table>
@@ -1174,29 +1832,27 @@ mark {
         <tr><td>Выбранная тема оформления (тёмная/светлая)</td><td>Сохранение пользовательской настройки интерфейса</td><td>Законный интерес Сайта</td></tr>
         <tr><td>Поисковые запросы внутри каталога</td><td>Отображение релевантных товаров в текущей сессии</td><td>Законный интерес Сайта</td></tr>
     </table>
-    <p>При обычном просмотре и при переходе по кнопке «Купить» Сайт не запрашивает логины и ID в Steam, Telegram и аналогичных сервисах, не собирает email и номер телефона и не имеет доступа к данным банковских карт. Всё это Пользователь указывает напрямую на защищённой странице оплаты Digiseller — это относится и к «Пополнению Steam», и к остальному каталогу.</p>
+    <p>При обычном просмотре и при переходе по кнопке «Купить» Сайт не запрашивает логины и ID в Steam, Telegram и аналогичных сервисах, не собирает email и номер телефона и не имеет доступа к данным банковских карт. Всё это Пользователь указывает напрямую на защищённой странице оплаты Digiseller — это относится к любому товару каталога, включая «Пополнение Steam».</p>
 
     <h2>3. Данные, которые Пользователь вводит на Digiseller</h2>
-    <p>Логин Steam / username Telegram / данные для аналогичных сервисов, email и данные оплаты Пользователь вводит напрямую на странице Digiseller, а не на Сайте, — Сайт их не получает, не хранит и доступа к ним не имеет ни по «Пополнению Steam», ни по остальному каталогу. Обработка этих данных регулируется собственной политикой конфиденциальности Digiseller (а для партнёрских товаров — также политикой конкретного продавца на Digiseller).</p>
+    <p>Логин Steam / username Telegram / данные для аналогичных сервисов, email и данные оплаты Пользователь вводит напрямую на странице Digiseller, а не на Сайте, — Сайт их не получает, не хранит и доступа к ним не имеет ни по одной позиции каталога. Обработка этих данных регулируется собственной политикой конфиденциальности Digiseller (а также политикой конкретного продавца на Digiseller, если он отличается от Digiseller).</p>
 
     <h2>4. Передача данных третьим лицам</h2>
-    <p><b>Digiseller (он же Plati.Market)</b> — платформа, которой Пользователь передаёт данные заказа и оплаты напрямую на своей странице; Сайт выступает лишь витриной/партнёром и этими данными не располагает.</p>
+    <p><b>Digiseller (он же Plati.Market)</b> — платформа, которой Пользователь передаёт данные заказа и оплаты напрямую на своей странице; Сайт выступает лишь витриной/партнёром и этими данными не располагает и не управляет.</p>
 
     <h2>5. Сроки хранения</h2>
     <p>Технические данные (п. 2) хранятся не дольше, чем необходимо для целей их сбора, либо до отзыва согласия Пользователем через cookie-настройки браузера. Сайт не хранит данные заказов — они находятся у Digiseller и доступны Пользователю в личном кабинете на digiseller.market/plati.market.</p>
 
     <h2>6. Права Пользователя</h2>
-    <p>В отношении данных, которые собирает сам Сайт (п. 2), Пользователь вправе запросить информацию об их обработке, потребовать их уточнения, блокирования или удаления, а также отозвать согласие на обработку — обратившись по контакту в п. 8. В отношении данных, введённых при оплате на Digiseller, обращаться следует напрямую в поддержку Digiseller.</p>
+    <p>В отношении технических данных, которые собирает сам Сайт (п. 2), Пользователь вправе запросить информацию об их обработке, потребовать их уточнения, блокирования или удаления, а также отозвать согласие на обработку — обратившись по контакту в п. 8. В отношении данных, введённых при оплате на Digiseller, обращаться следует напрямую в поддержку Digiseller.</p>
 
     <h2>7. Файлы cookie</h2>
     <p>Сайт использует cookie-файлы для сохранения пользовательских настроек (например, выбранной темы оформления) и для анализа посещаемости. Отключение cookie в настройках браузера может ограничить часть функций Сайта.</p>
 
-    <h2>8. Оператор персональных данных и контакты</h2>
+    <h2>8. Контакты</h2>
     <div class="req">
-        <p><b>⚠️ Заполнить перед публикацией сайта</b> — реквизиты того же лица, что указано в оферте (п. 8 оферты).</p>
-        <p><b>Наименование:</b> [ИП/Самозанятый/ООО — укажите полное наименование]</p>
-        <p><b>ИНН:</b> [укажите]</p>
-        <p><b>По вопросам обработки данных:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
+        <p>Сайт не является оператором персональных данных заказа и оплаты — эту роль по любому товару каталога несёт Digiseller (Plati.Market), реквизиты и политика которого опубликованы на digiseller.market / plati.market.</p>
+        <p><b>По вопросам работы Сайта и его технических данных (п. 2):</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
     </div>
 </div>
 </template>
@@ -1248,32 +1904,58 @@ mark {
 <template id="tpl-refund">
 <div class="legal-doc">
     <h1>Возврат и обмен</h1>
-    <p class="meta">Редакция от 29 августа 2026 г.</p>
-    <div class="notice">Правила возврата зависят от того, что вы покупали. <b>Пополнение Steam</b> — продавец Сайт, возврат оформляется через поддержку Сайта, см. п. 1–2. <b>Остальной каталог</b> (Telegram Premium/Stars, подписки, Robux) — Сайт лишь партнёр, продавец — третье лицо на Digiseller, возврат оформляется через Digiseller или этого продавца, см. п. 3.</div>
+    <p class="meta">Редакция от 30 августа 2026 г.</p>
+    <div class="notice">Сайт не продаёт ни один товар каталога напрямую — включая «Пополнение Steam». Продавцом по любой сделке является лицо, зарегистрированное продавцом товара на Digiseller, поэтому и возврат оформляется через Digiseller или этого продавца, а не через Сайт.</div>
 
-    <h2>1. Пополнение Steam: общий принцип</h2>
-    <p>В соответствии с п. 4 ст. 26.1 Закона РФ «О защите прав потребителей», цифровая услуга надлежащего качества, оказанная в полном объёме (средства зачислены на указанный Steam-аккаунт), возврату не подлежит, в том числе если Пользователь указал неверный логин Steam.</p>
+    <h2>1. Общий принцип</h2>
+    <p>В соответствии с п. 4 ст. 26.1 Закона РФ «О защите прав потребителей», цифровой товар/услуга надлежащего качества, переданные Пользователю в полном объёме (например, средства зачислены на указанный Steam-аккаунт), возврату не подлежат, в том числе если Пользователь указал неверные данные для доставки (логин Steam, username Telegram и т. п.).</p>
 
-    <h2>2. Пополнение Steam: когда возврат положен и куда обращаться</h2>
-    <p>Продавец услуги — Владелец Сайта, оплата принимается через Digiseller. Возврат оформляется через поддержку Сайта в следующих случаях:</p>
-    <ul>
-        <li><b>Деньги списаны, зачисление не произошло</b> — например, заказ на Digiseller завис в обработке дольше 24 часов без подтверждения.</li>
-        <li><b>Двойное списание по одному заказу</b> — по техническому сбою на стороне платёжной системы.</li>
-        <li><b>Ошибка в логине допущена по вине Сайта</b> (подтверждено логирование иного значения, чем ввёл Пользователь).</li>
-    </ul>
-    <p>Если Пользователь сам указал неверный логин Steam и средства уже зачислены по нему, — возврат не производится: услуга считается оказанной надлежащим образом, ответственность за правильность данных несёт Пользователь.</p>
-    <p>Заявка на возврат подаётся в поддержку Сайта (п. 4) с указанием номера заказа (из письма/чека Digiseller) и обстоятельств. Срок рассмотрения — до 10 рабочих дней; фактический возврат средств зависит от сроков платёжного оператора и банка-эмитента (обычно до 30 календарных дней).</p>
+    <h2>2. Пополнение Steam</h2>
+    <p>Продавцом услуги пополнения Steam является лицо, зарегистрированное продавцом на Digiseller, — не Владелец Сайта (см. «Публичную оферту», п. 2–3). Если Пользователь сам указал неверный логин Steam и средства уже зачислены по нему — возврат, как правило, не производится: услуга считается оказанной надлежащим образом. В остальных случаях (деньги списаны, а зачисление не произошло; двойное списание; иные технические сбои) заявка на возврат подаётся через Digiseller — открыть спор по заказу можно в личном кабинете покупателя на digiseller.market/plati.market, либо у продавца товара напрямую.</p>
 
-    <h2>3. Остальной каталог: куда обращаться</h2>
+    <h2>3. Остальной каталог</h2>
     <p>По Telegram Premium/Stars, подпискам (Spotify, Claude AI, ChatGPT) и Robux Сайт выступает партнёром/агентом Digiseller — продавцом является третье лицо, зарегистрированное на Digiseller как владелец конкретного товара. Все вопросы по оплате, доставке, возврату и обмену этих товаров решает Digiseller и/или этот продавец — именно там фиксируется факт оплаты и выдачи товара. Открыть спор по заказу можно в личном кабинете покупателя на digiseller.market/plati.market. Сайт Duskey не участвует в оплате этих заказов, не хранит данные о них и не может повлиять на решение по возврату.</p>
     <p>Типичные основания для возврата по правилам Digiseller: товар не доставлен в заявленный срок; переданный код/ключ оказался нерабочим или уже активированным не по вине покупателя; заказ оплачен, но по техническому сбою не поступил в обработку; товар не соответствует описанию. Точные условия и сроки устанавливает Digiseller или конкретный продавец.</p>
 
     <h2>4. Контакты</h2>
     <div class="req">
-        <p><b>По возврату за «Пополнение Steam» и по вопросам работы Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
+        <p>Спор по конкретному заказу открывается в личном кабинете покупателя на digiseller.market/plati.market — Сайт решения по возврату не принимает и повлиять на него не может.</p>
+        <p><b>По вопросам работы Сайта:</b> Telegram <a href="https://t.me/Duskey_Support" target="_blank" rel="noopener">@Duskey_Support</a></p>
     </div>
 </div>
 </template>
+
+<!-- бонусный тамагочи — плавающая кнопка, всегда поверх страницы; контент
+     панели рисует renderTamagotchi() в скрипте ниже -->
+<button type="button" class="tama-fab" id="tamaFab" aria-haspopup="dialog" aria-expanded="false" aria-label="Открыть питомца">
+    <span class="tama-fab-avatar" id="tamaFabAvatar"></span>
+    <span class="tama-fab-ping" id="tamaFabPing" hidden></span>
+</button>
+<div class="tama-panel-overlay" id="tamaOverlay" hidden></div>
+<div class="tama-panel" id="tamaPanel" role="dialog" aria-modal="true" aria-labelledby="tamaPanelTitle" hidden>
+    <div class="tama-panel-handle"></div>
+    <div class="tama-panel-head">
+        <h2 class="tama-panel-title" id="tamaPanelTitle">Твой питомец</h2>
+        <button type="button" class="tama-panel-close" id="tamaPanelClose" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+    </div>
+    <div class="tama-tabs" id="tamaTabs" hidden>
+        <button type="button" class="tama-tab-btn is-active" data-tab="pet">Питомец</button>
+        <button type="button" class="tama-tab-btn" data-tab="shop">Магазин</button>
+    </div>
+    <div class="tama-card" id="tamaCard"></div>
+</div>
+
+<div class="tama-levelup-overlay" id="tamaLevelUpOverlay" hidden>
+    <div class="tama-levelup-card">
+        <div class="tama-levelup-emoji">🎉</div>
+        <div class="tama-levelup-title" id="tamaLevelUpTitle">Новый уровень!</div>
+        <div class="tama-levelup-sub" id="tamaLevelUpSub"></div>
+        <button type="button" class="tama-levelup-close" id="tamaLevelUpClose">Ура!</button>
+    </div>
+</div>
+<div class="tama-toast" id="tamaToast"></div>
 
 <script>
 // ---- страница-мост для оплаты внутри Telegram ----
@@ -1319,20 +2001,28 @@ const quickBuyProducts = {
     steam: {
         label: 'Steam', title: 'Пополнение Steam', icon: ICONS.wallet,
         amounts: [100, 300, 500, 1000],
-        unit: '₽', rate: 1,
+        // fee — комиссия Steam за приём средств извне (не Digiseller и не
+        // Сайта): добавляется СВЕРХ суммы пополнения, см. qbPriceForAmount
+        unit: '₽', rate: 1, fee: 0.08,
         placeholder: 'Логин Steam',
         url: 'https://digiseller.me/asp2/pay.asp?id_d=5855479&ai=1108558',
-        partner: false, // продавец — Владелец Сайта, см. оферту п. 2-3
+        partner: true, // партнёрская ссылка — продавец на Digiseller, не Владелец Сайта (см. оферту)
     },
     stars: {
         label: 'Telegram Stars', title: 'Звёзды Telegram', icon: ICONS.star,
         amounts: [50, 100, 250, 500],
-        unit: '⭐', rate: 1.5, // ₽ за звезду для отображения итога
+        unit: '⭐', rate: 1.54, fee: 0, // курс — 1.54 ₽ за звезду
         placeholder: 'Username в Telegram',
         url: 'https://digiseller.me/asp2/pay.asp?id_d=5412816&ai=1108558',
-        partner: true, // партнёрская ссылка — продавец на Digiseller, не Сайт
+        partner: true, // партнёрская ссылка — продавец на Digiseller, не Владелец Сайта
     },
 };
+
+// цена к оплате за выбранное количество/сумму (курс + комиссия площадки,
+// если она есть — см. fee у Steam выше)
+function qbPriceForAmount(product, amount) {
+    return Math.round(amount * product.rate * (1 + (product.fee || 0)));
+}
 
 let qbActiveTab = 'steam';
 // per-tab amount, kept as a string so it maps 1:1 to the input's value
@@ -1356,15 +2046,27 @@ function qbSyncAmountUI() {
     });
 
     const buyBtn = document.getElementById('qbBuy');
+    const feeNote = document.getElementById('qbFeeNote');
     if (amount > 0) {
-        const total = product.unit === '₽' ? amount : Math.round(amount * product.rate);
+        const total = qbPriceForAmount(product, amount);
         buyBtn.textContent = `Купить за ${total} ₽`;
         buyBtn.disabled = false;
         buyBtn.onclick = () => openExternalPurchase(product.url);
+        // курс/комиссия — прямо рядом с ценой, а не спрятаны в тексте оферты
+        if (product.fee) {
+            feeNote.innerHTML = `Комиссия Steam <b>${Math.round(product.fee * 100)}%</b> уже включена в сумму — на баланс зачислится ${amount} ₽`;
+            feeNote.hidden = false;
+        } else if (product.rate !== 1) {
+            feeNote.innerHTML = `Курс: 1 ${product.unit} = <b>${product.rate} ₽</b>`;
+            feeNote.hidden = false;
+        } else {
+            feeNote.hidden = true;
+        }
     } else {
         buyBtn.textContent = 'Введите сумму';
         buyBtn.disabled = true;
         buyBtn.onclick = () => document.getElementById('qbAmountInput').focus();
+        feeNote.hidden = true;
     }
 }
 
@@ -1378,9 +2080,9 @@ function qbSetStatus(message, kind) {
 function renderQuickBuy() {
     const product = quickBuyProducts[qbActiveTab];
     document.getElementById('quickbuyTitle').textContent = product.title;
-    document.getElementById('qbSellerNote').innerHTML = product.partner
-        ? 'Партнёрская ссылка — продавец на <b>Digiseller</b>, не Duskey'
-        : 'Продаёт <b>Duskey</b> напрямую, оплата через Digiseller';
+    // все товары каталога — партнёрские (см. оферту): Владелец Сайта нигде
+    // не выступает продавцом и не принимает оплату напрямую
+    document.getElementById('qbSellerNote').innerHTML = 'Партнёрская ссылка — продавец на <b>Digiseller</b>, Сайт оплату не принимает';
 
     document.getElementById('qbTabs').innerHTML = Object.entries(quickBuyProducts).map(([key, p]) => `
         <button type="button" class="qb-tab${key === qbActiveTab ? ' is-active' : ''}" data-tab="${key}">${p.icon}<span>${p.label}</span></button>
@@ -1521,7 +2223,7 @@ function openExternalPurchase(url) {
 // Продавец — Владелец Сайта только у «Пополнения Steam» (партнёрская
 // программа не применяется). По всем остальным товарам Сайт выступает
 // партнёром/агентом Digiseller (ai=1108558): продавец — третье лицо на
-// Digiseller (partner: true, см. оферту п. 4-5 для точной формулировки;
+// Digiseller (partner: true, см. оферту п. 2-3 для точной формулировки;
 // отдельного бейджа на карточке для этого больше нет). У карточки один
 // из двух путей открытия:
 //  - key → внутренняя быстрая покупка (Steam/Stars-виджет выше) —
@@ -2200,6 +2902,1549 @@ legalClose.addEventListener('click', closeLegal);
 legalOverlay.addEventListener('click', (e) => { if (e.target === legalOverlay) closeLegal(); });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && legalOverlay.classList.contains('is-open')) closeLegal();
+});
+
+// ==================== ТАМАГОЧИ ====================
+// Бонусный питомец внизу страницы: выбор кота/собаки, кормление, игра,
+// сон. Состояние живёт в Supabase через свой мини-API на сервере
+// (см. routes/tamagotchi.js) — но если он недоступен (Supabase не
+// подключён, сеть легла и т.п.), сайт тихо переключается на локальное
+// хранение в localStorage, и питомец всё равно работает, просто не
+// синхронизируется между устройствами. Формулы "голода/бодрости/радости"
+// продублированы на клиенте (applyTamaDecay) и на сервере — если меняешь
+// цифры, меняй в обоих местах (см. комментарий в routes/tamagotchi.js).
+// Баланс монет — важная заметка (2026): аудит показал, что при
+// HAPPY_PER_MIN=1/8 и суточном кулдауне глажки расход монет на радость
+// одними игрушками составлял ~135 монет/день при доходе ~25-30 монет/день —
+// гарантированный уход в минус. Голод вернули к прежней скорости, радость
+// ослабили и сделали глажку регулярным (не разовым) источником радости —
+// см. подробный комментарий в routes/tamagotchi.js
+const TAMA_HUNGER_PER_MIN = 1 / 8;     // +1 голода каждые 8 минут (см. HUNGER_PER_MIN на сервере — держим идентичным)
+const TAMA_ENERGY_AWAKE_PER_MIN = 1 / 6; // -1 бодрости каждые 6 минут, если не спит
+const TAMA_ENERGY_SLEEP_PER_MIN = 2 / 10; // +2 бодрости каждые 10 минут, пока спит
+const TAMA_HAPPY_PER_MIN = 1 / 20;     // -1 радости каждые 20 минут
+const TAMA_PET_COOLDOWN_MS = 3 * 60 * 1000; // поглаживание даёт награду не чаще раза в 3 минуты (см. PET_COOLDOWN_MS на сервере) — реакция (звук/анимация/сердечки) при этом не ограничена и срабатывает всегда
+
+// см. careEaseFactor в routes/tamagotchi.js — держим формулу идентичной
+function tamaCareEaseFactor(level) {
+    const step = Math.min((level || 1) - 1, 7) * 0.05;
+    return Math.max(0.65, 1 - step);
+}
+
+// анти-фарм (см. HUNGER_FULL_MAX/HAPPY_PLAY_MAX/ENERGY_AWAKE_MAX в
+// routes/tamagotchi.js — держим идентичным): если потребность и так
+// закрыта, действие блокируется без траты еды/игрушки и без опыта —
+// питомец вместо этого "думает" вслух всплывающей мыслью над головой
+const TAMA_HUNGER_FULL_MAX = 8;
+const TAMA_HAPPY_PLAY_MAX = 92;
+const TAMA_ENERGY_AWAKE_MAX = 95;
+
+function tamaClamp(n) { return Math.max(0, Math.min(100, n)); }
+
+// -- прогресс, монеты, магазин, стрик --------------------------------
+// Вся эта логика (как и голод/бодрость/радость выше) продублирована на
+// сервере в routes/tamagotchi.js для офлайн-режима — правишь тут, правь
+// и там.
+function tamaXpToLevel(level) { return 40 + (level - 1) * 20; }
+
+// прибавляет опыт, сама разруливает левел-ап (может быть несколько
+// уровней разом, если xp прилетело много) и монетную награду за левел
+function tamaAwardXp(pet, amount) {
+    let xp = (pet.xp || 0) + amount;
+    let level = pet.level || 1;
+    let coins = pet.coins || 0;
+    let leveledUp = false;
+    while (xp >= tamaXpToLevel(level)) {
+        xp -= tamaXpToLevel(level);
+        level += 1;
+        coins += 10 + level * 2;
+        leveledUp = true;
+    }
+    return { pet: { ...pet, xp, level, coins }, leveledUp, newLevel: level };
+}
+
+// каталог магазина — общий "источник правды" для цен/эффектов, дублируется
+// в routes/tamagotchi.js для серверной проверки покупок и действий.
+// food/toy — расходники, копятся стопкой в pet.food / pet.toys и тратятся
+// по одному через кормление/игру (см. tamaApplyAction); accessory/background
+// — косметика, покупается один раз и потом переключается (tamaApplyEquip)
+const TAMA_SHOP_CATALOG = {
+    food_crumbs:    { name: 'Крошки',           emoji: '🍪', price: 4,  kind: 'food', hunger: 15, happiness: 2,  xp: 3,  coin: 2 },
+    food_kibble:    { name: 'Корм',             emoji: '🥫', price: 8,  kind: 'food', hunger: 30, happiness: 4,  xp: 5,  coin: 2 },
+    food_canned:    { name: 'Консервы',         emoji: '🍱', price: 14, kind: 'food', hunger: 45, happiness: 6,  xp: 7,  coin: 2 },
+    food_fish:      { name: 'Рыбка',            emoji: '🐟', price: 22, kind: 'food', hunger: 60, happiness: 10, xp: 10, coin: 2 },
+    food_steak:     { name: 'Стейк',            emoji: '🥩', price: 34, kind: 'food', hunger: 80, happiness: 14, xp: 14, coin: 3, levelReq: 3 },
+    food_cake:      { name: 'Праздничный торт', emoji: '🎂', price: 50, kind: 'food', hunger: 100, happiness: 25, xp: 20, coin: 4, levelReq: 5 },
+    food_delicacy:  { name: 'Деликатес шефа',   emoji: '🍣', price: 75, kind: 'food', hunger: 100, happiness: 30, xp: 28, coin: 5, levelReq: 8 },
+    toy_ball:       { name: 'Мячик',            emoji: '🎾', price: 10, kind: 'toy', happiness: 12, energy: 8,  hunger: 6,  xp: 6,  coin: 1 },
+    toy_rope:       { name: 'Верёвка',          emoji: '🪢', price: 16, kind: 'toy', happiness: 18, energy: 10, hunger: 8,  xp: 9,  coin: 2 },
+    toy_frisbee:    { name: 'Фрисби',           emoji: '🥏', price: 26, kind: 'toy', happiness: 25, energy: 14, hunger: 10, xp: 13, coin: 2, levelReq: 3 },
+    toy_laser:      { name: 'Лазер-игрушка',    emoji: '🔴', price: 40, kind: 'toy', happiness: 35, energy: 18, hunger: 12, xp: 18, coin: 3, levelReq: 6 },
+    bow:        { name: 'Бантик',    emoji: '🎀', price: 15, kind: 'accessory' },
+    scarf:      { name: 'Шарф',      emoji: '🧣', price: 18, kind: 'accessory' },
+    glasses:    { name: 'Очки',      emoji: '🕶️', price: 20, kind: 'accessory', levelReq: 2 },
+    cap:        { name: 'Кепка',     emoji: '🧢', price: 24, kind: 'accessory', levelReq: 3 },
+    crown:      { name: 'Корона',    emoji: '👑', price: 60, kind: 'accessory', levelReq: 5 },
+    bg_sunset:  { name: 'Закат',     emoji: '🌇', price: 25, kind: 'background' },
+    bg_night:   { name: 'Ночь',      emoji: '🌙', price: 30, kind: 'background', levelReq: 2 },
+    bg_space:   { name: 'Космос',    emoji: '🪐', price: 45, kind: 'background', levelReq: 4 },
+    bg_aurora:  { name: 'Сияние',    emoji: '🌈', price: 70, kind: 'background', levelReq: 7 },
+};
+// на случай, если в pet.food/toys лежит itemId, которого уже нет в
+// TAMA_SHOP_CATALOG (старая версия каталога, ручная правка и т.п.) — чтобы
+// такой предмет не блокировал кормление/игру молчаливой ошибкой, а просто
+// сработал по нейтральным базовым значениям
+const TAMA_FALLBACK_FOOD = { name: 'Еда', emoji: '🍽️', kind: 'food', hunger: 20, happiness: 5, xp: 4, coin: 1 };
+const TAMA_FALLBACK_TOY = { name: 'Игрушка', emoji: '🧸', kind: 'toy', happiness: 10, energy: 8, hunger: 6, xp: 5, coin: 1 };
+
+// редкость — чисто визуальная метка для магазина (цветная рамка/подпись),
+// геймплейно ни на что не влияет, поэтому в отличие от остального
+// каталога это НЕ дублируется на сервере (как и TAMA_PALETTE выше)
+const TAMA_RARITY = {
+    food_crumbs: 'common', food_kibble: 'common', food_canned: 'common', food_fish: 'common',
+    food_steak: 'rare', food_cake: 'epic', food_delicacy: 'legendary',
+    toy_ball: 'common', toy_rope: 'common', toy_frisbee: 'rare', toy_laser: 'epic',
+    bow: 'common', scarf: 'common', glasses: 'rare', cap: 'rare', crown: 'legendary',
+    bg_sunset: 'rare', bg_night: 'rare', bg_space: 'epic', bg_aurora: 'legendary',
+};
+const TAMA_RARITY_LABEL = { common: '', rare: 'Редкий', epic: 'Эпик', legendary: 'Легенда' };
+
+// "товар дня" — раз в сутки один случайный предмет со скидкой 30%, выбор
+// детерминирован датой (UTC) и порядком ключей каталога, поэтому офлайн-
+// клиент и сервер (см. dailyDealId в routes/tamagotchi.js) всегда сходятся
+// на одном и том же предмете без обмена данными — держим идентичным
+function tamaDailyDealSeed(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h;
+}
+function tamaDailyDealId() {
+    const ids = Object.keys(TAMA_SHOP_CATALOG);
+    return ids[tamaDailyDealSeed(tamaTodayStr()) % ids.length];
+}
+function tamaDealPrice(item) { return Math.max(1, Math.round(item.price * 0.7)); }
+
+// добивает недостающие поля прогресса у питомцев, заведённых до появления
+// этой фичи (старые записи в localStorage/Supabase) — без этого у них
+// были бы undefined level/coins/inventory и всё бы посыпалось
+function tamaEnsureFields(pet) {
+    if (!pet) return pet;
+    return {
+        ...pet,
+        level: pet.level || 1,
+        xp: pet.xp || 0,
+        coins: pet.coins != null ? pet.coins : 20,
+        streak: pet.streak || 0,
+        last_daily_claim: pet.last_daily_claim || null,
+        inventory: pet.inventory || [],
+        equipped_accessory: pet.equipped_accessory || null,
+        equipped_background: pet.equipped_background || null,
+        food: pet.food || {},
+        toys: pet.toys || {},
+        last_pet_at: pet.last_pet_at || null,
+    };
+}
+
+function tamaTotalFood(pet) { return Object.values(pet.food || {}).reduce((a, b) => a + b, 0); }
+function tamaTotalToys(pet) { return Object.values(pet.toys || {}).reduce((a, b) => a + b, 0); }
+
+function tamaTodayStr() { return new Date().toISOString().slice(0, 10); }
+function tamaYesterdayStr() { const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); }
+function tamaCanClaimDaily(pet) { return !pet || pet.last_daily_claim !== tamaTodayStr(); }
+
+// начисляет ежедневную награду и обновляет стрик — общая логика для
+// онлайн (routes/tamagotchi.js) и офлайн режимов
+function tamaApplyDailyClaim(pet) {
+    if (!tamaCanClaimDaily(pet)) return { blocked: 'Уже забрано сегодня — приходи завтра' };
+    const streak = pet.last_daily_claim === tamaYesterdayStr() ? (pet.streak || 0) + 1 : 1;
+    const bonusStreak = Math.min(streak, 10);
+    const coinsReward = 14 + bonusStreak * 2 + (streak % 7 === 0 ? 50 : 0);
+    const xpReward = 15 + bonusStreak * 3;
+    const withCoins = { ...pet, coins: (pet.coins || 0) + coinsReward, streak, last_daily_claim: tamaTodayStr(), updated_at: new Date().toISOString() };
+    const xpRes = tamaAwardXp(withCoins, xpReward);
+    return { pet: xpRes.pet, mood: 'play', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel, reward: { coins: coinsReward, xp: xpReward, streak, weekly: streak % 7 === 0 } };
+}
+
+// покупка предмета в магазине: еда/игрушки копятся стопкой и тратятся по
+// одной при кормлении/игре (см. tamaApplyAction), косметика — разовая
+// покупка в инвентарь, надевается отдельным действием (tamaApplyEquip)
+function tamaApplyBuy(pet, itemId) {
+    const item = TAMA_SHOP_CATALOG[itemId];
+    if (!item) return { blocked: 'Неизвестный товар' };
+    if (item.levelReq && (pet.level || 1) < item.levelReq) return { blocked: `Доступно с ${item.levelReq} уровня` };
+    const price = itemId === tamaDailyDealId() ? tamaDealPrice(item) : item.price;
+    if ((pet.coins || 0) < price) return { blocked: 'Недостаточно монет' };
+    if (item.kind === 'food' || item.kind === 'toy') {
+        const field = item.kind === 'food' ? 'food' : 'toys';
+        const store = { ...(pet[field] || {}) };
+        store[itemId] = (store[itemId] || 0) + 1;
+        return { pet: { ...pet, coins: pet.coins - price, [field]: store, updated_at: new Date().toISOString() } };
+    }
+    // косметика — разовая покупка
+    if ((pet.inventory || []).includes(itemId)) return { blocked: 'Уже куплено' };
+    const next = { ...pet, coins: pet.coins - price, inventory: [...(pet.inventory || []), itemId], updated_at: new Date().toISOString() };
+    return { pet: next };
+}
+
+function tamaApplyEquip(pet, slot, itemId) {
+    if (itemId && !(pet.inventory || []).includes(itemId)) return { blocked: 'Это ещё не куплено' };
+    const field = slot === 'background' ? 'equipped_background' : 'equipped_accessory';
+    const current = pet[field] || null;
+    const next = current === itemId ? null : itemId; // повторный клик по надетому — снимает
+    return { pet: { ...pet, [field]: next, updated_at: new Date().toISOString() } };
+}
+
+// пересчитывает статы "на сейчас" по времени, прошедшему с последнего
+// обновления — не трогает исходный объект
+function applyTamaDecay(pet) {
+    const minutes = Math.max(0, (Date.now() - new Date(pet.updated_at).getTime()) / 60000);
+    const ease = tamaCareEaseFactor(pet.level);
+    const hunger = tamaClamp(pet.hunger + minutes * TAMA_HUNGER_PER_MIN * ease);
+    const energy = tamaClamp(pet.energy + minutes * (pet.is_sleeping ? TAMA_ENERGY_SLEEP_PER_MIN : -TAMA_ENERGY_AWAKE_PER_MIN * ease));
+    const happiness = tamaClamp(pet.happiness - minutes * TAMA_HAPPY_PER_MIN * ease);
+    return { ...pet, hunger, energy, happiness };
+}
+
+// личность пользователя для привязки питомца: в Telegram — его id,
+// в обычном браузере — случайный идентификатор, который живёт в
+// localStorage. Оборачиваем в try/catch: в некоторых браузерах/режимах
+// (например, локальный файл file://, приватный режим Safari) обращение
+// к localStorage бросает исключение — без защиты это уронило бы вообще
+// весь скрипт на этой самой первой строке, и питомец не работал бы
+// целиком, даже офлайн-режим. Если localStorage недоступен — просто
+// используем id только на время сессии (без сохранения между визитами).
+function getTamaOwnerId() {
+    try {
+        if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+            return 'tg_' + tg.initDataUnsafe.user.id;
+        }
+        let id = localStorage.getItem('duskey_pet_uid');
+        if (!id) {
+            id = 'web_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+            localStorage.setItem('duskey_pet_uid', id);
+        }
+        return id;
+    } catch {
+        if (!getTamaOwnerId._fallback) {
+            getTamaOwnerId._fallback = 'session_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+        return getTamaOwnerId._fallback;
+    }
+}
+
+const TAMA_LOCAL_KEY = 'duskey_pet_state_' + getTamaOwnerId();
+let tamaOffline = false; // true, если сервер/Supabase недоступны — используем только localStorage
+
+function tamaLoadLocal() {
+    try {
+        const raw = localStorage.getItem(TAMA_LOCAL_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+}
+function tamaSaveLocal(pet) {
+    try { localStorage.setItem(TAMA_LOCAL_KEY, JSON.stringify(pet)); } catch { /* квота/приватный режим/file:// — переживём без сохранения между визитами */ }
+}
+
+// цвет питомца — чисто визуальная настройка, сервер её не хранит (нет
+// такой колонки в tamagotchi_pets), поэтому живёт только тут, отдельным
+// ключом на владельца
+const TAMA_COLOR_KEY = 'duskey_pet_color_' + getTamaOwnerId();
+function tamaLoadColor() {
+    try { return localStorage.getItem(TAMA_COLOR_KEY); } catch { return null; }
+}
+function tamaSaveColor(key) {
+    try { localStorage.setItem(TAMA_COLOR_KEY, key); } catch { /* переживём без сохранения */ }
+}
+
+// у fetch() к несуществующему серверу (например, открыли файл локально,
+// без сервера) в части браузеров есть шанс не отклониться быстро, а
+// зависнуть — тогда без ограничения по времени вся кнопка "виснет"
+// молча. Оборачиваем любой fetch тамагочи в гонку с таймаутом, чтобы
+// через 2.5с точно откатиться на localStorage, даже если сеть не
+// ответила вообще ничего.
+function tamaFetch(url, options) {
+    return Promise.race([
+        fetch(url, options),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('tama fetch timeout')), 2500)),
+    ]);
+}
+
+// единая точка доступа к состоянию питомца: сначала пробует серверный
+// /pet/..., при любой ошибке (нет Supabase, нет сети, таймаут) молча
+// уходит в localStorage и дальше работает только с ним
+const TamaStore = {
+    async load() {
+        if (!tamaOffline) {
+            try {
+                const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`);
+                if (res.status === 404) return null;
+                if (!res.ok) throw new Error('bad status');
+                return tamaEnsureFields(await res.json());
+            } catch { tamaOffline = true; }
+        }
+        return tamaEnsureFields(tamaLoadLocal());
+    },
+    async create(species, name) {
+        const pet = {
+            species, name: name || (species === 'cat' ? 'Котёнок' : 'Щенок'), hunger: 20, energy: 90, happiness: 90, is_sleeping: false,
+            level: 1, xp: 0, coins: 12, streak: 0, last_daily_claim: null, inventory: [], equipped_accessory: null, equipped_background: null,
+            food: { food_crumbs: 3 }, toys: {}, last_pet_at: null,
+            updated_at: new Date().toISOString(),
+        };
+        if (!tamaOffline) {
+            try {
+                const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ species, name: pet.name }),
+                });
+                if (!res.ok) throw new Error('bad status');
+                return tamaEnsureFields(await res.json());
+            } catch { tamaOffline = true; }
+        }
+        tamaSaveLocal(pet);
+        return pet;
+    },
+    async action(type, extra) {
+        if (!tamaOffline) {
+            try {
+                const res = await tamaFetch(`/pet/${encodeURIComponent(getTamaOwnerId())}/action`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: type, ...(extra || {}) }),
+                });
+                if (!res.ok) throw new Error('bad status');
+                return await res.json();
+            } catch { tamaOffline = true; }
+        }
+        // офлайн-версия того же самого действия — та же логика, что и на
+        // сервере (см. routes/tamagotchi.js), чтобы поведение совпадало
+        const pet = tamaEnsureFields(applyTamaDecay(tamaLoadLocal()));
+        const result = tamaApplyAction(pet, type, extra);
+        if (!result.blocked) tamaSaveLocal(result.pet);
+        return result;
+    },
+};
+
+// одна и та же логика действий используется и в офлайн-режиме на клиенте,
+// и как образец для серверной версии в routes/tamagotchi.js — если
+// меняешь баланс, меняй в обоих местах
+function tamaApplyAction(pet, type, extra) {
+    if (type === 'buy') return tamaApplyBuy(pet, extra && extra.itemId);
+    if (type === 'equip') return tamaApplyEquip(pet, extra && extra.slot, extra && extra.itemId);
+    if (type === 'claim_daily') return tamaApplyDailyClaim(pet);
+
+    const next = { ...pet, updated_at: new Date().toISOString() };
+    if (type === 'feed') {
+        if (pet.is_sleeping) return { pet, blocked: 'Он спит — не будите!' };
+        if (pet.hunger <= TAMA_HUNGER_FULL_MAX) return { pet, blocked: 'Я не хочу есть — я сыт!' };
+        const itemId = extra && extra.itemId;
+        if (!itemId) return { pet, blocked: 'Нет такой еды — загляните в магазин' };
+        const owned = (pet.food || {})[itemId] || 0;
+        if (owned <= 0) return { pet, blocked: 'Этой еды не осталось — купите ещё в магазине' };
+        const item = TAMA_SHOP_CATALOG[itemId] || TAMA_FALLBACK_FOOD;
+        const food = { ...pet.food, [itemId]: owned - 1 };
+        next.food = food;
+        next.hunger = tamaClamp(pet.hunger - item.hunger);
+        next.happiness = tamaClamp(pet.happiness + item.happiness);
+        next.coins = (pet.coins || 0) + item.coin;
+        const xpRes = tamaAwardXp(next, item.xp);
+        return { pet: xpRes.pet, mood: 'eat', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
+    }
+    if (type === 'play') {
+        if (pet.is_sleeping) return { pet, blocked: 'Он спит — не будите!' };
+        if (pet.energy < 15) return { pet, blocked: 'Он устал, пусть сначала поспит' };
+        if (pet.happiness >= TAMA_HAPPY_PLAY_MAX) return { pet, blocked: 'Не хочу играть — мне и так весело!' };
+        const itemId = extra && extra.itemId;
+        if (itemId) {
+            const owned = (pet.toys || {})[itemId] || 0;
+            if (owned <= 0) return { pet, blocked: 'Этой игрушки не осталось — купите ещё в магазине' };
+            const item = TAMA_SHOP_CATALOG[itemId] || TAMA_FALLBACK_TOY;
+            next.toys = { ...pet.toys, [itemId]: owned - 1 };
+            next.happiness = tamaClamp(pet.happiness + item.happiness);
+            next.energy = tamaClamp(pet.energy - item.energy);
+            next.hunger = tamaClamp(pet.hunger + item.hunger);
+            next.coins = (pet.coins || 0) + item.coin;
+            const xpRes = tamaAwardXp(next, item.xp);
+            return { pet: xpRes.pet, mood: 'play', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
+        }
+        // обычная игра без игрушки — доступна всегда, но скромнее по наградам
+        next.happiness = tamaClamp(pet.happiness + 12);
+        next.energy = tamaClamp(pet.energy - 10);
+        next.hunger = tamaClamp(pet.hunger + 5);
+        next.coins = (pet.coins || 0) + 1;
+        const xpRes = tamaAwardXp(next, 6);
+        return { pet: xpRes.pet, mood: 'play', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
+    }
+    if (type === 'pet') {
+        // глажка свайпом по экрану — работает всегда, даже спящему (тихо,
+        // без награды), но реальная награда (радость/опыт) не чаще раза в
+        // TAMA_PET_COOLDOWN_MS, чтобы быстрый свайп не фармился в бесконечный
+        // XP — при этом сердечки на экране клиент показывает при каждом свайпе
+        if (pet.is_sleeping) return { pet, mood: 'sleep' };
+        const lastPet = pet.last_pet_at ? new Date(pet.last_pet_at).getTime() : 0;
+        if (Date.now() - lastPet < TAMA_PET_COOLDOWN_MS) return { pet, mood: 'pet' };
+        next.happiness = tamaClamp(pet.happiness + 6);
+        next.last_pet_at = new Date().toISOString();
+        const xpRes = tamaAwardXp(next, 2);
+        return { pet: xpRes.pet, mood: 'pet', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel };
+    }
+    if (type === 'sleep') {
+        if (pet.energy >= TAMA_ENERGY_AWAKE_MAX) return { pet, blocked: 'Не хочу спать — я и так бодрый!' };
+        next.is_sleeping = true;
+        return { pet: next, mood: 'sleep' };
+    }
+    if (type === 'wake') {
+        next.is_sleeping = false;
+        // награда за сон зависит от того, сколько реально проспал (по
+        // времени с последнего updated_at, т.е. с момента клика "спать") —
+        // так спам сон/будить не даёт монет, а честный отдых даёт
+        if (pet.is_sleeping) {
+            const minutesSlept = Math.max(0, (Date.now() - new Date(pet.updated_at).getTime()) / 60000);
+            const coinsEarned = Math.min(6, Math.floor(minutesSlept / 15));
+            if (coinsEarned > 0) {
+                next.coins = (pet.coins || 0) + coinsEarned;
+                const xpRes = tamaAwardXp(next, coinsEarned * 2);
+                return { pet: xpRes.pet, mood: 'neutral', leveledUp: xpRes.leveledUp, newLevel: xpRes.newLevel, reward: { coins: coinsEarned } };
+            }
+        }
+        return { pet: next, mood: 'neutral' };
+    }
+    return { pet };
+}
+
+let tamaPet = null; // текущее состояние (уже с учётом decay) — источник правды для рендера
+let tamaSpeciesChoice = 'cat';
+let tamaColorChoice = tamaDefaultColor('cat'); // цвет, выбранный ДО того, как питомца завели
+let tamaColor = null; // цвет уже заведённого питомца (см. tamaLoadColor)
+
+function tamaMood(pet) {
+    if (pet.is_sleeping) return 'sleep';
+    if (pet.hunger >= 75 || pet.happiness <= 25) return 'sad';
+    if (pet.happiness >= 70) return 'happy';
+    return 'neutral';
+}
+
+// палитра расцветок питомца — чисто косметическая настройка, живёт только
+// в localStorage на клиенте (см. tamaLoadColor/tamaSaveColor ниже), сервер
+// про неё ничего не знает и не хранит (в tamagotchi_pets такой колонки нет)
+const TAMA_PALETTE = {
+    peach:    { name: 'Персиковый', base: '#ffb37a', light: '#ffe3c4', dark: '#e8935c', blush: '#ff8fa0' },
+    honey:    { name: 'Медовый',    base: '#f3c26b', light: '#ffecc4', dark: '#d99f45', blush: '#ff96a8' },
+    mint:     { name: 'Мятный',     base: '#7fd9b6', light: '#d6f5e8', dark: '#57b892', blush: '#ff9fb0' },
+    sky:      { name: 'Небесный',   base: '#8ec9ff', light: '#dcefff', dark: '#5fa3e6', blush: '#ff9fb0' },
+    lavender: { name: 'Лавандовый', base: '#b3a1ff', light: '#e6dfff', dark: '#9280eb', blush: '#ff9fc4' },
+    blossom:  { name: 'Сакура',     base: '#ff9fc4', light: '#ffdcea', dark: '#e97ba3', blush: '#ff7d9c' },
+};
+function tamaDefaultColor(species) { return species === 'dog' ? 'honey' : 'peach'; }
+
+// одна и та же SVG-иллюстрация используется и в маленьком превью выбора, и
+// в полный размер на сцене — она сама масштабируется под контейнер
+// (viewBox), поэтому не расползается в мелком размере. Стиль — простой
+// "кавайный" силуэт с крупными блестящими глазами вместо реалистичных
+// пропорций: так меньше эффект зловещей долины, чем у детализированной
+// мордочки на смайле-персонаже
+let tamaSvgUid = 0;
+function tamaPetSvg(species, colorKey, accessoryId) {
+    const c = TAMA_PALETTE[colorKey] || TAMA_PALETTE[tamaDefaultColor(species)];
+    const g = 'tamaGrad' + (tamaSvgUid++);
+    const acc = tamaAccessorySnippet(accessoryId, species);
+    if (species === 'dog') {
+        return `<svg class="tama-pet-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${c.light}"/><stop offset="100%" stop-color="${c.base}"/>
+            </linearGradient></defs>
+            <ellipse cx="100" cy="157" rx="52" ry="9" fill="rgba(0,0,0,0.15)"/>
+            <path class="pet-tail" d="M152 138 Q 172 130 182 104" fill="none" stroke="${c.dark}" stroke-width="14" stroke-linecap="round"/>
+            <ellipse cx="100" cy="112" rx="68" ry="62" fill="url(#${g})"/>
+            <path class="pet-ear-l" d="M50 78 C 24 84, 18 108, 24 130 C 28 144, 44 146, 50 134 C 55 114, 54 92, 50 78 Z" fill="${c.dark}"/>
+            <path class="pet-ear-r" d="M150 78 C 176 84, 182 108, 176 130 C 172 144, 156 146, 150 134 C 145 114, 146 92, 150 78 Z" fill="${c.dark}"/>
+            <ellipse cx="75" cy="169" rx="15" ry="10" fill="${c.light}"/>
+            <ellipse cx="125" cy="169" rx="15" ry="10" fill="${c.light}"/>
+            <ellipse cx="65" cy="126" rx="12" ry="8" fill="${c.blush}" opacity="0.55"/>
+            <ellipse cx="135" cy="126" rx="12" ry="8" fill="${c.blush}" opacity="0.55"/>
+            <g class="eyes-open">
+                <g class="eye">
+                    <ellipse cx="76" cy="103" rx="10" ry="12" fill="#4a4363"/>
+                    <circle cx="72" cy="98" r="4.4" fill="#fff"/>
+                    <circle cx="80" cy="106" r="2" fill="#fff" opacity="0.9"/>
+                </g>
+                <g class="eye">
+                    <ellipse cx="124" cy="103" rx="10" ry="12" fill="#4a4363"/>
+                    <circle cx="120" cy="98" r="4.4" fill="#fff"/>
+                    <circle cx="128" cy="106" r="2" fill="#fff" opacity="0.9"/>
+                </g>
+            </g>
+            <g class="eyes-closed">
+                <path d="M67 103 Q 76 96 85 103" stroke="#4a4363" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+                <path d="M115 103 Q 124 96 133 103" stroke="#4a4363" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+            </g>
+            <ellipse cx="100" cy="126" rx="7" ry="6" fill="#3d2d24"/>
+            <line class="mouth-neutral" x1="88" y1="133" x2="112" y2="133" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+            <g class="mouth-happy">
+                <path d="M86 132 Q 93 140 100 132 Q 107 140 114 132" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+            </g>
+            <path class="mouth-sad" d="M82 143 Q 100 131 118 143" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+            <line class="mouth-sleep" x1="94" y1="134" x2="106" y2="134" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+            <ellipse class="mouth-eat" cx="100" cy="134" rx="6" ry="6" fill="#3d2d24"/>
+            ${acc}
+        </svg>`;
+    }
+    return `<svg class="tama-pet-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${c.light}"/><stop offset="100%" stop-color="${c.base}"/>
+        </linearGradient></defs>
+        <ellipse cx="100" cy="157" rx="52" ry="9" fill="rgba(0,0,0,0.15)"/>
+        <path class="pet-tail" d="M150 142 Q 180 150 186 122 Q 190 104 172 100" fill="none" stroke="${c.dark}" stroke-width="12" stroke-linecap="round"/>
+        <path d="M44 74 Q 52 4 94 58 Z" fill="${c.dark}"/>
+        <path d="M156 74 Q 148 4 106 58 Z" fill="${c.dark}"/>
+        <path d="M52 68 Q 58 26 88 56 Z" fill="${c.blush}" opacity="0.65"/>
+        <path d="M148 68 Q 142 26 112 56 Z" fill="${c.blush}" opacity="0.65"/>
+        <ellipse cx="100" cy="112" rx="70" ry="62" fill="url(#${g})"/>
+        <ellipse cx="77" cy="171" rx="15" ry="10" fill="${c.light}"/>
+        <ellipse cx="123" cy="171" rx="15" ry="10" fill="${c.light}"/>
+        <ellipse cx="63" cy="128" rx="12" ry="8" fill="${c.blush}" opacity="0.55"/>
+        <ellipse cx="137" cy="128" rx="12" ry="8" fill="${c.blush}" opacity="0.55"/>
+        <g stroke="${c.light}" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.85">
+            <path d="M42 118 Q 25 113 12 110"/><path d="M42 126 Q 24 126 10 127"/><path d="M42 134 Q 25 139 12 144"/>
+            <path d="M158 118 Q 175 113 188 110"/><path d="M158 126 Q 176 126 190 127"/><path d="M158 134 Q 175 139 188 144"/>
+        </g>
+        <g class="eyes-open">
+            <g class="eye">
+                <ellipse cx="78" cy="105" rx="10" ry="12" fill="#4a4363"/>
+                <circle cx="74" cy="100" r="4.4" fill="#fff"/>
+                <circle cx="82" cy="108" r="2" fill="#fff" opacity="0.9"/>
+            </g>
+            <g class="eye">
+                <ellipse cx="122" cy="105" rx="10" ry="12" fill="#4a4363"/>
+                <circle cx="118" cy="100" r="4.4" fill="#fff"/>
+                <circle cx="126" cy="108" r="2" fill="#fff" opacity="0.9"/>
+            </g>
+        </g>
+        <g class="eyes-closed">
+            <path d="M69 105 Q 78 98 87 105" stroke="#4a4363" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+            <path d="M113 105 Q 122 98 131 105" stroke="#4a4363" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+        </g>
+        <path d="M100 121 q -5 0 -5 4.5 q 0 4.5 5 5.5 q 5 -1 5 -5.5 q 0 -4.5 -5 -4.5 z" fill="#e0708a"/>
+        <line class="mouth-neutral" x1="88" y1="132" x2="112" y2="132" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+        <g class="mouth-happy">
+            <path d="M86 131 Q 93 139 100 131 Q 107 139 114 131" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+        </g>
+        <path class="mouth-sad" d="M83 142 Q 100 130 117 142" stroke="#3d2d24" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+        <line class="mouth-sleep" x1="94" y1="133" x2="106" y2="133" stroke="#3d2d24" stroke-width="2.6" stroke-linecap="round"/>
+        <ellipse class="mouth-eat" cx="100" cy="133" rx="6" ry="6" fill="#3d2d24"/>
+        ${acc}
+    </svg>`;
+}
+
+function tamaColorRowHtml(selected) {
+    return Object.entries(TAMA_PALETTE).map(([key, c]) =>
+        `<button type="button" class="tama-color-swatch${key === selected ? ' is-active' : ''}" data-color="${key}" style="--swatch-color:${c.base}" aria-label="${c.name}" title="${c.name}"></button>`
+    ).join('');
+}
+
+function tamaPickerHtml() {
+    return `
+        <p class="tama-picker-lead">Выбери, кого завести — он будет жить у тебя на сайте: можно кормить, играть с ним и укладывать спать 🐾</p>
+        <div class="tama-preview-wrap">
+            <span class="tama-pet species-${tamaSpeciesChoice} mood-happy" id="tamaPreviewFace">${tamaPetSvg(tamaSpeciesChoice, tamaColorChoice)}</span>
+        </div>
+        <div class="tama-pick-row">
+            <button type="button" class="tama-pick-card${tamaSpeciesChoice === 'cat' ? ' is-active' : ''}" data-species="cat">
+                <span class="tama-pick-emoji">🐱</span><span>Котёнок</span>
+            </button>
+            <button type="button" class="tama-pick-card${tamaSpeciesChoice === 'dog' ? ' is-active' : ''}" data-species="dog">
+                <span class="tama-pick-emoji">🐶</span><span>Щенок</span>
+            </button>
+        </div>
+        <p class="tama-color-lead">Цвет</p>
+        <div class="tama-color-row" id="tamaColorRow">${tamaColorRowHtml(tamaColorChoice)}</div>
+        <div class="tama-name-row" id="tamaNameRow">
+            <input type="text" class="tama-name-input" id="tamaNameInput" placeholder="Как назовём?" maxlength="16">
+            <button type="button" class="tama-confirm-btn" id="tamaConfirmBtn">Завести</button>
+        </div>
+    `;
+}
+
+// --- аксессуары ---
+// Раньше аксессуар был отдельным HTML-элементом (эмодзи), просто
+// абсолютно спозиционированным поверх SVG питомца процентами — из-за
+// этого он и выглядел как "прибитая картинка в воздухе": не совпадал
+// точно с ушами/глазами и не двигался вместе с самим спрайтом при
+// анимациях. Теперь аксессуар — часть ТОЙ ЖЕ SVG-иллюстрации (см.
+// tamaPetSvg ниже), с координатами, снятыми напрямую с частей тела
+// (глаза/уши/шея), поэтому: 1) он физически совпадает с телом, 2) любая
+// CSS-анимация всего спрайта (глажка-hop, дыхание во сне и т.д.) сама
+// тащит аксессуар за собой — отдельно синхронизировать больше не нужно.
+const TAMA_ACC_POS = {
+    cat: { bow: { x: 56, y: 76, rot: -18 }, cap: { x: 100, y: 40 }, crown: { x: 100, y: 30 }, flower: { x: 44, y: 70 }, eyeL: { x: 78, y: 105 }, eyeR: { x: 122, y: 105 } },
+    dog: { bow: { x: 40, y: 78, rot: -22 }, cap: { x: 100, y: 42 }, crown: { x: 100, y: 32 }, flower: { x: 42, y: 72 }, eyeL: { x: 76, y: 103 }, eyeR: { x: 124, y: 103 } },
+};
+function tamaAccessorySnippet(id, species) {
+    if (!id) return '';
+    const item = TAMA_SHOP_CATALOG[id];
+    if (!item) return '';
+    const pos = TAMA_ACC_POS[species] || TAMA_ACC_POS.cat;
+    if (id === 'glasses') {
+        const { x: lx, y: ly } = pos.eyeL, { x: rx, y: ry } = pos.eyeR;
+        return `<g class="tama-accessory tama-accessory-glasses">
+            <circle cx="${lx}" cy="${ly}" r="15" fill="rgba(255,255,255,0.22)" stroke="#3d2d24" stroke-width="3"/>
+            <circle cx="${rx}" cy="${ry}" r="15" fill="rgba(255,255,255,0.22)" stroke="#3d2d24" stroke-width="3"/>
+            <line x1="${lx + 15}" y1="${ly}" x2="${rx - 15}" y2="${ry}" stroke="#3d2d24" stroke-width="3"/>
+            <line x1="${lx - 15}" y1="${ly}" x2="${lx - 23}" y2="${ly - 3}" stroke="#3d2d24" stroke-width="3" stroke-linecap="round"/>
+            <line x1="${rx + 15}" y1="${ry}" x2="${rx + 23}" y2="${ry - 3}" stroke="#3d2d24" stroke-width="3" stroke-linecap="round"/>
+        </g>`;
+    }
+    if (id === 'monocle') {
+        // одна линза на правом глазу (координаты сняты с eyeR) + цепочка вниз
+        const { x: ex, y: ey } = pos.eyeR;
+        return `<g class="tama-accessory tama-accessory-monocle">
+            <circle cx="${ex}" cy="${ey}" r="14" fill="rgba(255,255,255,0.14)" stroke="#caa23d" stroke-width="3"/>
+            <path d="M${ex + 12} ${ey + 8} Q${ex + 22} ${ey + 16} ${ex + 17} ${ey + 27}" stroke="#caa23d" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </g>`;
+    }
+    if (id === 'scarf') {
+        const cy = species === 'dog' ? 148 : 150;
+        return `<g class="tama-accessory tama-accessory-scarf">
+            <path d="M64 ${cy} Q100 ${cy + 18} 136 ${cy} L136 ${cy + 8} Q100 ${cy + 24} 64 ${cy + 8} Z" fill="#e2564f" stroke="#b73d38" stroke-width="1.5"/>
+            <path d="M92 ${cy + 8} L88 ${cy + 32} L100 ${cy + 24} L112 ${cy + 32} L108 ${cy + 8} Z" fill="#e2564f" stroke="#b73d38" stroke-width="1.5"/>
+        </g>`;
+    }
+    if (id === 'bow') {
+        const { x: cx, y: cy, rot } = pos.bow;
+        return `<g class="tama-accessory tama-accessory-bow" transform="rotate(${rot} ${cx} ${cy})">
+            <path d="M${cx} ${cy} L${cx + 14} ${cy - 9} L${cx + 14} ${cy + 9} Z" fill="#e2568f" stroke="#c23f75" stroke-width="1"/>
+            <path d="M${cx} ${cy} L${cx - 14} ${cy - 9} L${cx - 14} ${cy + 9} Z" fill="#e2568f" stroke="#c23f75" stroke-width="1"/>
+            <circle cx="${cx}" cy="${cy}" r="4.5" fill="#c23f75"/>
+        </g>`;
+    }
+    if (id === 'cap') {
+        const { x: cx, y: topY } = pos.cap;
+        const w = 34;
+        return `<g class="tama-accessory tama-accessory-cap">
+            <path d="M${cx - w} ${topY + 22} Q${cx - w - 4} ${topY} ${cx} ${topY - 8} Q${cx + w + 4} ${topY} ${cx + w} ${topY + 22} Z" fill="#4a7fd6" stroke="#3a63ad" stroke-width="1.5"/>
+            <ellipse cx="${cx}" cy="${topY + 22}" rx="${w + 2}" ry="6" fill="#3a63ad"/>
+            <path d="M${cx} ${topY + 22} Q${cx + w + 18} ${topY + 22} ${cx + w + 26} ${topY + 30} Q${cx + w + 10} ${topY + 35} ${cx} ${topY + 28} Z" fill="#3a63ad"/>
+        </g>`;
+    }
+    if (id === 'crown') {
+        const { x: cx, y: topY } = pos.crown;
+        const w = 30;
+        return `<g class="tama-accessory tama-accessory-crown">
+            <path d="M${cx - w} ${topY + 14} L${cx - w + 2} ${topY - 2} L${cx - w / 2} ${topY + 8} L${cx} ${topY - 10} L${cx + w / 2} ${topY + 8} L${cx + w - 2} ${topY - 2} L${cx + w} ${topY + 14} Z" fill="#ffd25a" stroke="#e0a92e" stroke-width="1.5"/>
+            <circle cx="${cx}" cy="${topY + 2}" r="2.6" fill="#ff6f91"/>
+            <circle cx="${cx - w / 2}" cy="${topY + 10}" r="2" fill="#6fd6e6"/>
+            <circle cx="${cx + w / 2}" cy="${topY + 10}" r="2" fill="#6fd6e6"/>
+        </g>`;
+    }
+    if (id === 'flower') {
+        const { x: cx, y: cy } = pos.flower;
+        const petals = [0, 72, 144, 216, 288].map((a) => {
+            const rad = a * Math.PI / 180;
+            const px = cx + Math.cos(rad) * 6, py = cy + Math.sin(rad) * 6;
+            return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="#ff9fc7"/>`;
+        }).join('');
+        return `<g class="tama-accessory tama-accessory-flower">${petals}<circle cx="${cx}" cy="${cy}" r="4" fill="#ffd25a"/></g>`;
+    }
+    return '';
+}
+
+
+function tamaTopbarHtml(pet) {
+    const need = tamaXpToLevel(pet.level || 1);
+    const pct = Math.min(100, Math.round(((pet.xp || 0) / need) * 100));
+    const ease = tamaCareEaseFactor(pet.level);
+    const easePct = Math.round((1 - ease) * 100);
+    return `
+        <div class="tama-topbar">
+            <div class="tama-level-wrap">
+                <div class="tama-level-row"><span>Ур. ${pet.level || 1}${easePct ? ` <span class="tama-ease-tag" title="С этим уровнем голод/усталость/скука наступают медленнее">🌟 −${easePct}%</span>` : ''}</span><span>${pet.xp || 0}/${need} XP</span></div>
+                <div class="tama-xp-bar"><div class="tama-xp-fill" style="width:${pct}%"></div></div>
+            </div>
+            <span class="tama-chip coins">🪙 ${pet.coins || 0}</span>
+            ${pet.streak ? `<span class="tama-chip streak">🔥 ${pet.streak}</span>` : ''}
+        </div>
+    `;
+}
+
+function tamaDailyBannerHtml(pet) {
+    if (!tamaCanClaimDaily(pet)) return '';
+    return `
+        <div class="tama-daily-banner" id="tamaDailyBanner">
+            <span class="tama-daily-emoji">🎁</span>
+            <span class="tama-daily-text"><b>Ежедневная награда ждёт!</b>${pet.streak ? `Стрик ${pet.streak} дн. — не пропусти` : 'Зайди и забери монеты'}</span>
+            <span class="tama-daily-go">Забрать</span>
+        </div>
+    `;
+}
+
+function tamaItemPickerRowsHtml(pet, kind) {
+    const store = pet[kind === 'food' ? 'food' : 'toys'] || {};
+    // ВАЖНО: раньше тут перебирался TAMA_SHOP_CATALOG и фильтровался по
+    // тому, что есть в store — из-за этого купленный предмет, которого
+    // почему-либо уже нет (или ещё нет) в текущем каталоге на этом
+    // устройстве/при рассинхроне версий, молча пропадал из списка кормления,
+    // хотя количество в store оставалось. Теперь перебираем сам store —
+    // то, что реально куплено, гарантированно попадёт в список; каталог
+    // нужен только чтобы взять красивое имя/эмодзи, а если записи там нет —
+    // подставляем нейтральную заглушку вместо того, чтобы прятать предмет
+    return Object.entries(store)
+        .filter(([, count]) => (count || 0) > 0)
+        .map(([id, count]) => {
+            const item = TAMA_SHOP_CATALOG[id];
+            const emoji = item ? item.emoji : (kind === 'food' ? '🍽️' : '🧸');
+            const name = item ? item.name : id;
+            return `
+                <button type="button" class="tama-item-row" data-${kind}-item="${id}">
+                    <span class="tama-item-emoji">${emoji}</span>
+                    <span class="tama-item-name">${name}</span>
+                    <span class="tama-item-count">×${count}</span>
+                </button>
+            `;
+        }).join('');
+}
+
+// открыт/закрыт список кормления/игрушек — раньше это состояние жило
+// только в DOM-классе .is-open, а периодический тик обновления статов
+// (раз в 60с) и вообще любое действие вызывают renderTamagotchi(), который
+// полностью пересобирает HTML заново — свежая разметка всегда закрыта,
+// поэтому если пересчёт статов срабатывал ровно в момент, когда список был
+// открыт, он молча захлопывался без участия пользователя. Теперь состояние
+// хранится в переменных и подставляется в разметку при каждом рендере
+let tamaFoodPickerOpen = false;
+let tamaToyPickerOpen = false;
+function tamaFoodPickerHtml(pet) {
+    return `<div class="tama-item-picker${tamaFoodPickerOpen ? ' is-open' : ''}" id="tamaFoodPicker">${tamaItemPickerRowsHtml(pet, 'food')}</div>`;
+}
+
+function tamaToyPickerHtml(pet) {
+    return `
+        <div class="tama-item-picker${tamaToyPickerOpen ? ' is-open' : ''}" id="tamaToyPicker">
+            <button type="button" class="tama-item-row" data-play-free="1">
+                <span class="tama-item-emoji">🖐️</span><span class="tama-item-name">Просто поиграть</span>
+            </button>
+            ${tamaItemPickerRowsHtml(pet, 'toy')}
+        </div>
+    `;
+}
+
+function tamaStageHtml(pet) {
+    const mood = tamaMood(pet);
+    const bgId = pet.equipped_background;
+    return `
+        ${tamaTopbarHtml(pet)}
+        ${tamaDailyBannerHtml(pet)}
+        <div class="tama-stage${bgId ? ' has-bg' : ''}"${bgId ? ` data-bg="${bgId}"` : ''}>
+            <div class="tama-pet tama-pet-touch species-${pet.species} mood-${mood}" id="tamaPet">
+                <div class="tama-thought" id="tamaThought"></div>
+                ${tamaPetSvg(pet.species, tamaColor, pet.equipped_accessory)}
+                ${mood === 'sleep' ? '<div class="tama-zzz"><span>z</span><span>Z</span><span>Z</span></div>' : ''}
+                <div class="tama-pet-shadow"></div>
+                <div class="tama-pet-fx" id="tamaFx"></div>
+            </div>
+            <div class="tama-pet-name-row">
+                <p class="tama-pet-name">${escapeHtml(pet.name)}</p>
+                <button type="button" class="tama-recolor-btn" id="tamaRecolorBtn" aria-label="Изменить цвет" title="Изменить цвет">🎨</button>
+            </div>
+            <div class="tama-recolor-panel" id="tamaRecolorPanel" hidden>
+                <div class="tama-color-row">${tamaColorRowHtml(tamaColor)}</div>
+            </div>
+        </div>
+        <div class="tama-stats">
+            <div class="tama-stat"><span class="tama-stat-icon">🍖</span><div class="tama-bar"><div class="tama-bar-fill satiety" style="width:${Math.round(100 - pet.hunger)}%"></div></div></div>
+            <div class="tama-stat"><span class="tama-stat-icon">⚡</span><div class="tama-bar"><div class="tama-bar-fill energy" style="width:${Math.round(pet.energy)}%"></div></div></div>
+            <div class="tama-stat"><span class="tama-stat-icon">💛</span><div class="tama-bar"><div class="tama-bar-fill happiness" style="width:${Math.round(pet.happiness)}%"></div></div></div>
+        </div>
+        <div class="tama-actions">
+            <button type="button" class="tama-act-btn" id="tamaFeedBtn" ${pet.is_sleeping ? 'disabled' : ''}>🍖<span>Кормить${tamaTotalFood(pet) ? ' · ' + tamaTotalFood(pet) : ''}</span></button>
+            <button type="button" class="tama-act-btn" id="tamaPlayBtn" ${pet.is_sleeping ? 'disabled' : ''}>🎾<span>Играть</span></button>
+            <button type="button" class="tama-act-btn" id="tamaSleepBtn">${pet.is_sleeping ? '☀️<span>Разбудить</span>' : '💤<span>Спать</span>'}</button>
+        </div>
+        ${tamaFoodPickerHtml(pet)}
+        ${tamaToyPickerHtml(pet)}
+        <p class="tama-msg" id="tamaMsg"></p>
+    `;
+}
+
+function tamaShopSectionHtml(pet, kind, title) {
+    const items = Object.entries(TAMA_SHOP_CATALOG).filter(([, it]) => it.kind === kind);
+    if (!items.length) return '';
+    const dealId = tamaDailyDealId();
+    const cards = items.map(([id, item]) => {
+        const owned = (pet.inventory || []).includes(id);
+        const equippedField = kind === 'background' ? 'equipped_background' : 'equipped_accessory';
+        const isEquipped = owned && pet[equippedField] === id;
+        const locked = item.levelReq && (pet.level || 1) < item.levelReq;
+        const stackCount = kind === 'food' ? (pet.food || {})[id] || 0 : kind === 'toy' ? (pet.toys || {})[id] || 0 : 0;
+        const isDeal = id === dealId && !locked && !(kind !== 'food' && kind !== 'toy' && owned);
+        const price = isDeal ? tamaDealPrice(item) : item.price;
+        const priceHtml = isDeal ? `<s class="tama-shop-price-old">${item.price}🪙</s> ${price}🪙` : `${price}🪙`;
+        const rarity = TAMA_RARITY[id] || 'common';
+        let btnHtml;
+        if (kind === 'food' || kind === 'toy') {
+            if (locked) {
+                btnHtml = `<button type="button" class="tama-shop-btn" disabled>🔒 Ур. ${item.levelReq}</button>`;
+            } else {
+                const disabled = (pet.coins || 0) < price;
+                btnHtml = `<button type="button" class="tama-shop-btn" data-buy="${id}" ${disabled ? 'disabled' : ''}>Купить · ${priceHtml}</button>`;
+            }
+        } else if (locked) {
+            btnHtml = `<button type="button" class="tama-shop-btn" disabled>🔒 Ур. ${item.levelReq}</button>`;
+        } else if (!owned) {
+            const disabled = (pet.coins || 0) < price;
+            btnHtml = `<button type="button" class="tama-shop-btn" data-buy="${id}" ${disabled ? 'disabled' : ''}>Купить · ${priceHtml}</button>`;
+        } else {
+            btnHtml = `<button type="button" class="tama-shop-btn ${isEquipped ? 'is-equipped-btn' : 'is-owned'}" data-equip="${id}" data-slot="${kind === 'background' ? 'background' : 'accessory'}">${isEquipped ? 'Снять' : 'Надеть'}</button>`;
+        }
+        return `
+            <div class="tama-shop-item${isEquipped ? ' is-equipped' : ''}${isDeal ? ' is-deal' : ''}" data-rarity="${rarity}">
+                ${isDeal ? '<span class="tama-shop-deal-badge">🔥 −30%</span>' : ''}
+                ${rarity !== 'common' ? `<span class="tama-shop-rarity tama-rarity-${rarity}">${TAMA_RARITY_LABEL[rarity]}</span>` : ''}
+                ${kind === 'background' ? `<span class="tama-shop-bg-preview" data-bg="${id}"></span>` : `<span class="tama-shop-emoji">${item.emoji}</span>`}
+                <span class="tama-shop-name">${item.name}${stackCount ? ` <span class="tama-shop-count">×${stackCount}</span>` : ''}</span>
+                ${btnHtml}
+            </div>
+        `;
+    }).join('');
+    return `<p class="tama-shop-section-title">${title}</p><div class="tama-shop-grid">${cards}</div>`;
+}
+
+function tamaShopDealBannerHtml() {
+    const item = TAMA_SHOP_CATALOG[tamaDailyDealId()];
+    if (!item) return '';
+    return `<div class="tama-deal-banner"><span class="tama-daily-emoji">${item.emoji}</span><span class="tama-daily-text"><b>Товар дня: ${item.name}</b>Сегодня −30% — успей, завтра будет другой</span></div>`;
+}
+
+function tamaShopHtml(pet) {
+    return `
+        ${tamaTopbarHtml(pet)}
+        ${tamaShopDealBannerHtml()}
+        ${tamaShopSectionHtml(pet, 'food', 'Еда')}
+        ${tamaShopSectionHtml(pet, 'toy', 'Игрушки')}
+        ${tamaShopSectionHtml(pet, 'accessory', 'Аксессуары')}
+        ${tamaShopSectionHtml(pet, 'background', 'Фоны')}
+        <p class="tama-msg" id="tamaMsg"></p>
+    `;
+}
+
+function escapeHtml(s) { return String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
+
+// звуковая обратная связь. Короткие игровые сигналы (хруст, "дзынь",
+// колыбельная и т.п.) — синтезированные на лету через Web Audio API,
+// правдоподобной записи для них взять неоткуда. А вот момент, где раньше
+// звук был самым "фальшивым" — мурлыканье/дыхание питомца под рукой —
+// теперь построен на настоящих записях из /public/sounds (кошачье
+// мурлыканье и настоящий лай), см. purrStart/purrStop ниже
+const TamaSound = (() => {
+    let ctx = null;
+    let master = null;
+    function getCtx() {
+        if (!ctx) {
+            try {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // общая шина: мягкий lowpass срезает "цифровой" верх у чистых
+                // осцилляторов/шума — без него square/triangle звучат резко
+                // и дёшево ("пищалка"), с ним — мягче и приятнее на слух
+                master = ctx.createGain();
+                master.gain.value = 0.9;
+                const lp = ctx.createBiquadFilter();
+                lp.type = 'lowpass'; lp.frequency.value = 5200; lp.Q.value = 0.4;
+                master.connect(lp).connect(ctx.destination);
+            } catch { return null; }
+        }
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        return ctx;
+    }
+    // тон + мягкий "хор" (второй голос на пару центов ниже) — так одиночный
+    // осциллятор перестаёт звучать как плоский "бип" из старой аркады
+    function tone(freq, start, dur, type, gain) {
+        const c = getCtx();
+        if (!c) return;
+        try {
+            const t0 = c.currentTime + start;
+            const g = c.createGain();
+            g.gain.setValueAtTime(0.0001, t0);
+            g.gain.linearRampToValueAtTime(gain || 0.1, t0 + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            g.connect(master);
+            [1, 0.997].forEach((detune, i) => {
+                const osc = c.createOscillator();
+                osc.type = type || 'sine';
+                osc.frequency.value = freq * detune;
+                const vg = c.createGain();
+                vg.gain.value = i === 0 ? 1 : 0.5;
+                osc.connect(vg).connect(g);
+                osc.start(t0);
+                osc.stop(t0 + dur + 0.03);
+            });
+        } catch { /* звук — необязательная приятность, тихо игнорируем сбой */ }
+    }
+    // короткий шумовой буфер — основа для "не-музыкальных" звуков (хруст,
+    // дыхание, пыхтение), которые чистым осциллятором не изобразить
+    let noiseBuf = null;
+    function getNoiseBuf(c) {
+        if (noiseBuf && noiseBuf.sampleRate === c.sampleRate) return noiseBuf;
+        const len = Math.floor(c.sampleRate * 2);
+        const buf = c.createBuffer(1, len, c.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        noiseBuf = buf;
+        return buf;
+    }
+    function noiseBurst(start, dur, freq, q, gain) {
+        const c = getCtx();
+        if (!c) return;
+        try {
+            const src = c.createBufferSource();
+            src.buffer = getNoiseBuf(c);
+            const filt = c.createBiquadFilter();
+            filt.type = 'bandpass'; filt.frequency.value = freq; filt.Q.value = q;
+            const g = c.createGain();
+            const t0 = c.currentTime + start;
+            g.gain.setValueAtTime(0.0001, t0);
+            g.gain.linearRampToValueAtTime(gain, t0 + 0.008);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            src.connect(filt).connect(g).connect(master);
+            src.start(t0);
+            src.stop(t0 + dur + 0.02);
+        } catch { /* тихо игнорируем */ }
+    }
+    // непрерывное мурчание/пыхтение, пока гладят (см. TamaSound.purrStart/Stop) —
+    // одновременно активен только один инстанс, повторные вызовы игнорируются.
+    // Раньше оба варианта были синтезированы (шум + фильтры) — рабочий
+    // компромисс без исходников, но звучал как "почти похоже". Теперь
+    // используются настоящие записи (см. /public/sounds): у кота — реальное
+    // мурлыканье зациклено с плавным кроссфейдом; у собаки живого пыхтения
+    // под рукой не было, поэтому вместо синтетического "дыхания" — короткий
+    // довольный лай из настоящей записи, повторяемый с паузами (так натуральнее,
+    // чем непрерывный лай, который в жизни звучал бы навязчиво)
+    let purrNodes = null;
+    function purrStart(species) {
+        if (purrNodes) return;
+        try {
+            if (species === 'dog') {
+                const bark = new Audio('/sounds/dog-bark-single.mp3');
+                bark.volume = 0.55;
+                const playBark = () => {
+                    try {
+                        bark.currentTime = 0;
+                        bark.playbackRate = 0.94 + Math.random() * 0.12; // лёгкий разброс — не звучит как заезженная пластинка
+                        bark.play().catch(() => {});
+                    } catch { /* тихо игнорируем */ }
+                };
+                playBark();
+                const intervalId = setInterval(playBark, 1450);
+                purrNodes = { intervalId, el: bark };
+            } else {
+                const purr = new Audio('/sounds/cat-purr.mp3');
+                purr.loop = true;
+                purr.volume = 0;
+                purr.play().catch(() => {});
+                let v = 0;
+                const fadeId = setInterval(() => {
+                    v = Math.min(0.5, v + 0.06);
+                    purr.volume = v;
+                    if (v >= 0.5) clearInterval(fadeId);
+                }, 30);
+                purrNodes = { el: purr, fadeId };
+            }
+        } catch { purrNodes = null; }
+    }
+    function purrStop() {
+        if (!purrNodes) return;
+        const nodes = purrNodes;
+        purrNodes = null;
+        try {
+            if (nodes.intervalId) clearInterval(nodes.intervalId);
+            if (nodes.fadeId) clearInterval(nodes.fadeId);
+            const el = nodes.el;
+            if (!el) return;
+            // плавно затухаем и только потом ставим на паузу — резкий stop
+            // посреди мурлыканья/лая звучит как обрыв записи
+            let v = el.volume;
+            const fadeOut = setInterval(() => {
+                v = Math.max(0, v - 0.08);
+                el.volume = v;
+                if (v <= 0) { clearInterval(fadeOut); el.pause(); }
+            }, 30);
+        } catch { /* тихо игнорируем */ }
+    }
+    return {
+        feed()    {
+            // хруст — те же щелчки, но чуть более "мясистые" (ниже центр
+            // фильтра) плюс тёплое двухнотное довольное "ням-ням" в конце
+            // вместо одной ноты
+            for (let i = 0; i < 3; i++) noiseBurst(i * 0.11, 0.1, 1400 + Math.random() * 600, 1.2, 0.15);
+            tone(392, 0.34, 0.1, 'sine', 0.055);
+            tone(330, 0.44, 0.14, 'sine', 0.05);
+        },
+        // было на резком square — теперь мягкий восходящий мажорный трезвучный
+        // перезвон (triangle), больше похоже на приятный игровой "дзынь", а не
+        // на писк калькулятора
+        play()    { tone(523, 0, 0.09, 'triangle', 0.07); tone(659, 0.06, 0.09, 'triangle', 0.07); tone(784, 0.12, 0.13, 'triangle', 0.07); },
+        pet()     { tone(700, 0, 0.06, 'sine', 0.05); tone(880, 0.05, 0.09, 'sine', 0.05); },
+        purrStart, purrStop,
+        sleep()   {
+            // раньше — шумовое "дыхание", звучало резко/скребуще. Теперь
+            // тихая нисходящая колыбельная из трёх мягких тонов (никакого
+            // шума вообще) — гораздо спокойнее на слух
+            tone(392, 0, 0.3, 'sine', 0.045);
+            tone(330, 0.28, 0.32, 'sine', 0.04);
+            tone(262, 0.58, 0.5, 'sine', 0.038);
+        },
+        wake()    {
+            const c = getCtx();
+            if (c) {
+                try {
+                    // зевок — лёгкий "провис" высоты тона перед бодрым чирком
+                    const osc = c.createOscillator();
+                    osc.type = 'sine';
+                    const g = c.createGain();
+                    const t0 = c.currentTime;
+                    osc.frequency.setValueAtTime(260, t0);
+                    osc.frequency.linearRampToValueAtTime(200, t0 + 0.14);
+                    osc.frequency.linearRampToValueAtTime(320, t0 + 0.28);
+                    g.gain.setValueAtTime(0.0001, t0);
+                    g.gain.linearRampToValueAtTime(0.05, t0 + 0.05);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+                    osc.connect(g).connect(master);
+                    osc.start(t0); osc.stop(t0 + 0.32);
+                } catch { /* тихо игнорируем */ }
+            }
+            tone(659, 0.28, 0.1, 'triangle', 0.07);
+        },
+        // было на square — теперь мягкий двухголосный "кассовый" перезвон
+        buy()     { tone(587, 0, 0.06, 'triangle', 0.06); tone(880, 0.05, 0.1, 'triangle', 0.06); },
+        equip()   { tone(660, 0, 0.05, 'sine', 0.06); tone(880, 0.05, 0.06, 'sine', 0.05); },
+        claim()   { tone(587, 0, 0.08, 'triangle', 0.08); tone(880, 0.07, 0.08, 'triangle', 0.08); tone(1174, 0.14, 0.14, 'triangle', 0.08); },
+        denied()  { tone(220, 0, 0.08, 'sine', 0.06); tone(180, 0.07, 0.12, 'sine', 0.05); },
+        levelUp() { tone(523, 0, 0.09, 'triangle', 0.09); tone(659, 0.08, 0.09, 'triangle', 0.09); tone(784, 0.16, 0.09, 'triangle', 0.09); tone(1046, 0.24, 0.2, 'triangle', 0.09); },
+    };
+})();
+
+// "мысль" питомца — всплывающий пузырь над головой (см. .tama-thought в
+// стилях); используется и для блокированных действий ("я не хочу есть"),
+// и для фоновых напоминаний, когда потребность становится критичной
+// (см. tamaCheckAmbientThought)
+let tamaThoughtTimer = null;
+function tamaShowThought(text) {
+    const el = document.getElementById('tamaThought');
+    if (!el) { tamaShowToast(text); return; }
+    el.textContent = text;
+    el.classList.add('is-visible');
+    clearTimeout(tamaThoughtTimer);
+    tamaThoughtTimer = setTimeout(() => el.classList.remove('is-visible'), 2400);
+}
+
+// напоминания появляются один раз при пересечении порога, а не на каждом
+// тике — иначе мысль бы моргала над головой каждую минуту без остановки
+const tamaAmbientState = { hungry: false, sad: false, tired: false };
+function tamaCheckAmbientThought(pet) {
+    if (!pet || pet.is_sleeping) return;
+    if (pet.hunger >= 80 && !tamaAmbientState.hungry) { tamaAmbientState.hungry = true; tamaShowThought('Хочу есть... 🍖'); }
+    else if (pet.hunger < 55) tamaAmbientState.hungry = false;
+    if (pet.happiness <= 25 && !tamaAmbientState.sad) { tamaAmbientState.sad = true; tamaShowThought('Мне грустно... 💧'); }
+    else if (pet.happiness > 45) tamaAmbientState.sad = false;
+    if (pet.energy <= 15 && !tamaAmbientState.tired) { tamaAmbientState.tired = true; tamaShowThought('Так хочется спать... 💤'); }
+    else if (pet.energy > 35) tamaAmbientState.tired = false;
+}
+
+function tamaFx(emoji, extraClass) {
+    const box = document.getElementById('tamaFx');
+    if (!box) return;
+    const el = document.createElement('span');
+    el.className = 'tama-fx-item' + (extraClass ? ' ' + extraClass : '');
+    el.textContent = emoji;
+    el.style.left = (45 + Math.random() * 10) + '%';
+    box.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+}
+
+// еда едет ко рту и там уменьшается (проглочена), а не улетает вверх мимо
+// головы как обычный fx — так видно, что питомца именно покормили
+function tamaEatFx(emoji) {
+    const box = document.getElementById('tamaFx');
+    if (!box) return;
+    const el = document.createElement('span');
+    el.className = 'tama-eat-item';
+    el.textContent = emoji;
+    el.style.left = (46 + Math.random() * 8) + '%';
+    box.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+}
+
+const TAMA_HEART_EMOJI = ['💗', '💕', '💓'];
+// несколько сердечек с небольшим разбросом по позиции/времени — для
+// свайпа-поглаживания, выглядит живее одного статичного сердечка
+function tamaHeartFx() {
+    const box = document.getElementById('tamaFx');
+    if (!box) return;
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+            const el = document.createElement('span');
+            el.className = 'tama-fx-item tama-heart-item';
+            el.textContent = TAMA_HEART_EMOJI[Math.floor(Math.random() * TAMA_HEART_EMOJI.length)];
+            el.style.left = (30 + Math.random() * 40) + '%';
+            box.appendChild(el);
+            el.addEventListener('animationend', () => el.remove());
+        }, i * 90);
+    }
+}
+
+// глажка свайпом пальцем/мышью по питомцу — не привязана к количеству
+// кликов, а к самому жесту "провели пальцем": во время движения сыплются
+// сердечки, и каждое отпускание пальца всегда засчитывается действием
+// 'pet' — реакция (звук/анимация/сердечки) не ограничена по частоте,
+// ограничена только фактическая награда (радость/опыт), и то на уровне
+// TAMA_PET_COOLDOWN_MS внутри tamaApplyAction/сервера, а не здесь
+const TAMA_PET_HEART_GAP_MS = 220;
+let tamaLastHeartAt = 0;
+// пока true — идёт активный жест поглаживания; фоновые автообновления
+// (тик раз в 30с, откат временного настроения через 1.5с — см. ниже)
+// на это время придерживают свой renderTamagotchi(), чтобы пересборка
+// разметки не попала ровно в середину жеста мыши и не оборвала его
+let tamaIsPetting = false;
+function tamaSetupPetting() {
+    const petEl = document.getElementById('tamaPet');
+    if (!petEl) return;
+    let dragging = false;
+
+    // элемент #tamaPet пересоздаётся при каждом renderTamagotchi() (в том
+    // числе от фонового тика раз в 30с) — если такой ре-рендер попадёт
+    // ровно в момент активной глажки, ссылка petEl, захваченная выше,
+    // останется указывать на уже отсоединённый от DOM узел, и добавление
+    // класса анимации перестанет быть видно (жест как будто "обрывается").
+    // Поэтому здесь всегда берём АКТУАЛЬНЫЙ узел из DOM, а не полагаемся
+    // на замыкание — тогда анимация продолжается на новом узле как ни в
+    // чём не бывало, даже если разметка успела перерисоваться
+    function liveEl() { return document.getElementById('tamaPet'); }
+
+    function onMove() {
+        if (!dragging) return;
+        const now = Date.now();
+        if (now - tamaLastHeartAt > TAMA_PET_HEART_GAP_MS) {
+            tamaLastHeartAt = now;
+            tamaHeartFx();
+            const el = liveEl();
+            if (el) el.classList.add(tamaPet && tamaPet.is_sleeping ? 'sleep-purr' : 'mood-pet-touch');
+        }
+    }
+    function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        tamaIsPetting = false;
+        const el = liveEl();
+        if (el) el.classList.remove('mood-pet-touch', 'sleep-purr');
+        TamaSound.purrStop();
+        // засчитываем поглаживание при ЛЮБОМ отпускании на питомце — не
+        // только при заметном свайпе. Раньше требовалось сдвинуть палец
+        // больше чем на 6px, из-за чего лёгкое/короткое касание молча не
+        // засчитывалось, и приходилось гладить второй раз, чтобы сработало.
+        // Вызывается ВСЕГДА, без троттлинга по времени — питомец должен
+        // реагировать на каждое поглаживание, даже если их много подряд;
+        // от бесконечного фарма опыта защищает не эта функция, а суточный
+        // TAMA_PET_COOLDOWN_MS внутри самого действия 'pet'
+        tamaHeartFx();
+        tamaDoAction('pet', null);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', endDrag);
+        window.removeEventListener('pointercancel', endDrag);
+    }
+    petEl.addEventListener('pointerdown', (e) => {
+        // без preventDefault быстрый боковой свайп мышью иногда запускает
+        // нативное выделение текста/перетаскивание прямо над питомцем —
+        // браузер обрывает наш жест собственным pointercancel раньше
+        // отпускания кнопки; и то и другое здесь не нужно
+        e.preventDefault();
+        dragging = true;
+        tamaIsPetting = true;
+        TamaSound.purrStart(tamaPet ? tamaPet.species : 'cat');
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', endDrag);
+        window.addEventListener('pointercancel', endDrag);
+    });
+}
+
+function tamaUpdatePreviewFace() {
+    const face = document.getElementById('tamaPreviewFace');
+    if (!face) return;
+    face.className = `tama-pet species-${tamaSpeciesChoice} mood-happy`;
+    face.innerHTML = tamaPetSvg(tamaSpeciesChoice, tamaColorChoice);
+}
+
+let tamaActiveTab = 'pet';
+
+function renderTamagotchi() {
+    tamaUpdateFab();
+    const card = document.getElementById('tamaCard');
+    const tabs = document.getElementById('tamaTabs');
+    if (!tamaPet) {
+        tabs.hidden = true;
+        card.innerHTML = tamaPickerHtml();
+        card.querySelectorAll('.tama-pick-card').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                tamaSpeciesChoice = btn.dataset.species;
+                card.querySelectorAll('.tama-pick-card').forEach((b) => b.classList.toggle('is-active', b === btn));
+                tamaUpdatePreviewFace();
+            });
+        });
+        card.querySelectorAll('#tamaColorRow .tama-color-swatch').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                tamaColorChoice = btn.dataset.color;
+                card.querySelectorAll('#tamaColorRow .tama-color-swatch').forEach((b) => b.classList.toggle('is-active', b === btn));
+                tamaUpdatePreviewFace();
+            });
+        });
+        document.getElementById('tamaConfirmBtn').addEventListener('click', async () => {
+            const nameInput = document.getElementById('tamaNameInput');
+            const btn = document.getElementById('tamaConfirmBtn');
+            btn.disabled = true;
+            try {
+                tamaPet = await TamaStore.create(tamaSpeciesChoice, nameInput.value.trim());
+                tamaColor = tamaColorChoice;
+                tamaSaveColor(tamaColor);
+                renderTamagotchi();
+            } catch (e) {
+                // не должно происходить (TamaStore сам ловит свои ошибки и
+                // уходит в localStorage), но если что-то всё же прорвалось —
+                // лучше явно сказать об этом, чем молча ничего не делать
+                console.error('tamagotchi create failed:', e);
+                btn.disabled = false;
+                const lead = card.querySelector('.tama-picker-lead');
+                if (lead) lead.textContent = 'Не получилось завести питомца — попробуйте ещё раз.';
+            }
+        });
+        return;
+    }
+
+    tabs.hidden = false;
+    tabs.querySelectorAll('.tama-tab-btn').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.tab === tamaActiveTab));
+
+    if (tamaActiveTab === 'shop') {
+        card.innerHTML = tamaShopHtml(tamaPet);
+        card.querySelectorAll('[data-buy]').forEach((btn) => {
+            btn.addEventListener('click', () => tamaDoAction('buy', null, { itemId: btn.dataset.buy }));
+        });
+        card.querySelectorAll('[data-equip]').forEach((btn) => {
+            btn.addEventListener('click', () => tamaDoAction('equip', null, { itemId: btn.dataset.equip, slot: btn.dataset.slot }));
+        });
+        return;
+    }
+
+    card.innerHTML = tamaStageHtml(tamaPet);
+    tamaSetupPetting();
+    document.getElementById('tamaFeedBtn').addEventListener('click', () => {
+        if (tamaTotalFood(tamaPet) <= 0) {
+            tamaActiveTab = 'shop';
+            renderTamagotchi();
+            tamaShowToast('Еды нет — купите в магазине 🛒');
+            return;
+        }
+        tamaFoodPickerOpen = !tamaFoodPickerOpen;
+        tamaToyPickerOpen = false;
+        document.getElementById('tamaFoodPicker').classList.toggle('is-open', tamaFoodPickerOpen);
+        const toyPicker = document.getElementById('tamaToyPicker');
+        if (toyPicker) toyPicker.classList.remove('is-open');
+    });
+    document.getElementById('tamaPlayBtn').addEventListener('click', () => {
+        tamaToyPickerOpen = !tamaToyPickerOpen;
+        tamaFoodPickerOpen = false;
+        document.getElementById('tamaToyPicker').classList.toggle('is-open', tamaToyPickerOpen);
+        const foodPicker = document.getElementById('tamaFoodPicker');
+        if (foodPicker) foodPicker.classList.remove('is-open');
+    });
+    card.querySelectorAll('[data-food-item]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.foodItem;
+            const item = TAMA_SHOP_CATALOG[id];
+            // используем эмодзи именно этого корма, а не универсальную кость —
+            // так видно, чем конкретно покормили (рыбкой, тортом и т.д.)
+            tamaDoAction('feed', item ? item.emoji : '🍖', { itemId: id });
+        });
+    });
+    card.querySelectorAll('[data-toy-item]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.toyItem;
+            const item = TAMA_SHOP_CATALOG[id];
+            tamaDoAction('play', item ? item.emoji : '💫', { itemId: id });
+        });
+    });
+    const freePlayBtn = card.querySelector('[data-play-free]');
+    if (freePlayBtn) freePlayBtn.addEventListener('click', () => tamaDoAction('play', '💫'));
+    document.getElementById('tamaSleepBtn').addEventListener('click', () => tamaDoAction(tamaPet.is_sleeping ? 'wake' : 'sleep', null));
+    document.getElementById('tamaRecolorBtn').addEventListener('click', () => {
+        document.getElementById('tamaRecolorPanel').hidden = false;
+    });
+    card.querySelectorAll('.tama-recolor-panel .tama-color-swatch').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            tamaColor = btn.dataset.color;
+            tamaSaveColor(tamaColor);
+            renderTamagotchi();
+        });
+    });
+    const dailyBanner = document.getElementById('tamaDailyBanner');
+    if (dailyBanner) dailyBanner.addEventListener('click', () => tamaDoAction('claim_daily', null));
+}
+
+document.getElementById('tamaTabs').querySelectorAll('.tama-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        if (tamaActiveTab === btn.dataset.tab) return;
+        tamaActiveTab = btn.dataset.tab;
+        renderTamagotchi();
+    });
+});
+
+// значок на плавающей кнопке — живая мини-копия питомца (или приглашение
+// завести, если его ещё нет) плюс "точка внимания", когда стоит зайти:
+// пусто/грустно/голоден/устал
+function tamaUpdateFab() {
+    const avatar = document.getElementById('tamaFabAvatar');
+    const ping = document.getElementById('tamaFabPing');
+    if (!avatar || !ping) return;
+    if (!tamaPet) {
+        avatar.className = 'tama-fab-avatar';
+        avatar.textContent = '🐾';
+        avatar.style.fontSize = '24px';
+        avatar.style.display = 'flex';
+        avatar.style.alignItems = 'center';
+        avatar.style.justifyContent = 'center';
+        ping.hidden = false;
+        return;
+    }
+    const mood = tamaMood(tamaPet);
+    avatar.style.fontSize = '';
+    avatar.style.display = '';
+    avatar.className = `tama-fab-avatar tama-pet species-${tamaPet.species} mood-${mood}`;
+    avatar.innerHTML = tamaPetSvg(tamaPet.species, tamaColor, tamaPet.equipped_accessory)
+        + (mood === 'sleep' ? '<div class="tama-zzz"><span>z</span><span>Z</span><span>Z</span></div>' : '');
+    const needsAttention = tamaPet.hunger >= 70 || tamaPet.happiness <= 30 || (!tamaPet.is_sleeping && tamaPet.energy < 20) || tamaCanClaimDaily(tamaPet);
+    ping.hidden = !needsAttention;
+}
+
+let tamaMoodTimer = null;
+async function tamaDoAction(type, fxEmoji, extra) {
+    const msg = document.getElementById('tamaMsg');
+    try {
+        const result = await TamaStore.action(type, extra);
+        if (result.blocked) {
+            tamaShowThought(result.blocked);
+            TamaSound.denied();
+            if (msg) msg.textContent = result.blocked;
+            return;
+        }
+        tamaPet = result.pet;
+        renderTamagotchi();
+        if (fxEmoji) {
+            if (type === 'feed') tamaEatFx(fxEmoji);
+            else tamaFx(fxEmoji);
+        }
+        // еда/игрушка сама по себе расходуется и не "новая вещь" как
+        // аксессуар/фон, но лакомство или игрушка получше — это тоже повод
+        // радоваться заметнее, а не одинаково для крошек и деликатеса
+        let happyExtraMs = 0;
+        if ((type === 'feed' || type === 'play') && extra && extra.itemId) {
+            const usedRarity = TAMA_RARITY[extra.itemId] || 'common';
+            if (usedRarity === 'legendary') { tamaFx('💖'); tamaFx('✨'); happyExtraMs = 700; }
+            else if (usedRarity === 'epic') { tamaFx('✨'); happyExtraMs = 400; }
+            else if (usedRarity === 'rare') { happyExtraMs = 200; }
+        }
+        if (type === 'feed') TamaSound.feed();
+        else if (type === 'play') TamaSound.play();
+        else if (type === 'pet') TamaSound.pet();
+        else if (type === 'sleep') TamaSound.sleep();
+        else if (type === 'wake') TamaSound.wake();
+        else if (type === 'buy') TamaSound.buy();
+        else if (type === 'equip') TamaSound.equip();
+        else if (type === 'claim_daily') TamaSound.claim();
+        // временное настроение (жуёт/играет) — на секунду перекрывает
+        // обычное mood, вычисленное по статам, потом рендер вернёт как есть
+        if (result.mood === 'eat' || result.mood === 'play' || result.mood === 'pet') {
+            const petEl = document.getElementById('tamaPet');
+            if (petEl) {
+                petEl.classList.remove('mood-happy', 'mood-neutral', 'mood-sad');
+                petEl.classList.add('mood-' + result.mood);
+                clearTimeout(tamaMoodTimer);
+                // если в эти 1.5с человек уже гладит питомца заново — не
+                // перерисовываем прямо посреди нового жеста (см. tamaIsPetting
+                // в tamaSetupPetting), а откладываем откат мордочки, пока
+                // жест не закончится
+                const revert = () => {
+                    if (tamaIsPetting) { tamaMoodTimer = setTimeout(revert, 300); return; }
+                    renderTamagotchi();
+                };
+                tamaMoodTimer = setTimeout(revert, 1500 + happyExtraMs);
+            }
+        }
+        if (type === 'claim_daily' && result.reward) {
+            tamaShowToast(`+${result.reward.coins}🪙 · День ${result.reward.streak}${result.reward.weekly ? ' · Недельный бонус!' : ''}`);
+            tamaConfettiBurst();
+        } else if (type === 'buy') {
+            // каждая НОВАЯ вещь (аксессуар/фон — они не расходуются, в
+            // отличие от еды/игрушек) — повод порадоваться, и по-разному в
+            // зависимости от редкости: обычная — просто искорка, топовая —
+            // конфетти на весь экран, как при левел-апе
+            const boughtItem = extra && TAMA_SHOP_CATALOG[extra.itemId];
+            if (boughtItem && boughtItem.kind !== 'food' && boughtItem.kind !== 'toy') {
+                tamaCelebrateNewItem(extra.itemId);
+            } else {
+                tamaShowToast('Готово!');
+            }
+        }
+        if (result.leveledUp) tamaCelebrateLevelUp(result.newLevel);
+    } catch (e) {
+        console.error('tamagotchi action failed:', e);
+        if (msg) msg.textContent = 'Не получилось — попробуйте ещё раз.';
+    }
+}
+
+function tamaShowToast(text) {
+    const el = document.getElementById('tamaToast');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('is-visible');
+    clearTimeout(tamaShowToast._t);
+    tamaShowToast._t = setTimeout(() => el.classList.remove('is-visible'), 2600);
+}
+
+function tamaConfettiBurst(count) {
+    const emojis = ['🎉', '✨', '🪙', '🎊', '⭐'];
+    for (let i = 0; i < (count || 16); i++) {
+        const el = document.createElement('span');
+        el.className = 'tama-confetti-piece';
+        el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.animationDuration = (1.6 + Math.random() * 1.2) + 's';
+        el.style.fontSize = (14 + Math.random() * 14) + 'px';
+        document.body.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    }
+}
+
+// радость от НОВОЙ вещи (первая покупка аксессуара/фона — они уникальны,
+// повторно купить нельзя, так что каждый успешный buy для них и есть
+// "впервые") — масштаб реакции растёт вместе с редкостью, чтобы топовые
+// вещи ощущались особенными, а не как рядовая покупка крошек.
+// Важно: покупка происходит на вкладке "Магазин", где нет ни спрайта
+// питомца (#tamaPet), ни контейнера искр (#tamaFx) — они существуют только
+// на вкладке "Питомец". Поэтому реакция построена на confetti (это
+// document.body, видно с любой вкладки), а не на emoji-искрах поверх
+// питомца, которые здесь молча не сработали бы. tamaFx/tamaHeartFx всё
+// равно вызываются "на всякий случай" — если игрок почему-то уже на
+// вкладке питомца, они добавят детали, а если нет — тихо ничего не сделают
+function tamaCelebrateNewItem(itemId) {
+    const item = TAMA_SHOP_CATALOG[itemId];
+    if (!item) return;
+    const rarity = TAMA_RARITY[itemId] || 'common';
+    const petEl = document.getElementById('tamaPet');
+    if (petEl) {
+        petEl.classList.remove('mood-happy', 'mood-neutral', 'mood-sad');
+        petEl.classList.add('mood-happy');
+        clearTimeout(tamaMoodTimer);
+        const revert = () => {
+            if (tamaIsPetting) { tamaMoodTimer = setTimeout(revert, 300); return; }
+            renderTamagotchi();
+        };
+        tamaMoodTimer = setTimeout(revert, rarity === 'legendary' || rarity === 'epic' ? 2200 : 1500);
+    }
+    if (rarity === 'legendary') {
+        tamaConfettiBurst(20);
+        setTimeout(() => tamaConfettiBurst(20), 350);
+        TamaSound.levelUp();
+        tamaShowToast(`👑 Легендарная вещь! Питомцу очень нравится: ${item.name}`);
+    } else if (rarity === 'epic') {
+        tamaConfettiBurst(16);
+        TamaSound.claim();
+        tamaShowToast(`✨ Питомец в восторге: ${item.name}!`);
+    } else if (rarity === 'rare') {
+        tamaConfettiBurst(9);
+        tamaHeartFx();
+        tamaFx('⭐');
+        tamaShowToast(`Питомцу нравится: ${item.name}`);
+    } else {
+        tamaConfettiBurst(5);
+        tamaFx('✨');
+        tamaShowToast(`Питомец рад обновке: ${item.name}`);
+    }
+}
+
+function tamaCelebrateLevelUp(newLevel) {
+    TamaSound.levelUp();
+    const overlay = document.getElementById('tamaLevelUpOverlay');
+    document.getElementById('tamaLevelUpTitle').textContent = `Новый уровень: ${newLevel}!`;
+    document.getElementById('tamaLevelUpSub').textContent = 'Питомец подрос и получил монеты в награду 🪙';
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+    tamaConfettiBurst();
+    const close = () => {
+        overlay.classList.remove('is-visible');
+        setTimeout(() => { overlay.hidden = true; }, 250);
+    };
+    document.getElementById('tamaLevelUpClose').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+}
+
+async function initTamagotchi() {
+    try {
+        const stored = await TamaStore.load();
+        tamaPet = stored ? applyTamaDecay(stored) : null;
+    } catch (e) {
+        console.error('tamagotchi init failed:', e);
+        tamaPet = null;
+    }
+    tamaColor = tamaLoadColor() || tamaDefaultColor(tamaPet ? tamaPet.species : 'cat');
+    renderTamagotchi();
+    // каждые 30с тихо пересчитываем статы на глазах — так полоски живут
+    // сами по себе, даже если ничего не нажимать (и точка внимания на
+    // кнопке обновляется вместе с ними через renderTamagotchi -> tamaUpdateFab);
+    // заодно проверяем, не пора ли питомцу "подумать вслух" о критичной
+    // потребности (см. tamaCheckAmbientThought)
+    setInterval(() => {
+        if (!tamaPet) return;
+        tamaPet = applyTamaDecay(tamaPet);
+        // не перерисовываем прямо посреди активного поглаживания — иначе
+        // пересборка #tamaPet может попасть ровно на середину жеста мышью
+        // (см. tamaIsPetting в tamaSetupPetting); статы просто досчитаются
+        // на следующем тике 30с спустя
+        if (tamaIsPetting) return;
+        renderTamagotchi();
+        if (tamaActiveTab === 'pet' && tamaPanelEl.classList.contains('is-visible')) tamaCheckAmbientThought(tamaPet);
+    }, 30000);
+}
+initTamagotchi();
+
+// -- плавающая кнопка: открыть/закрыть панель питомца --
+const tamaFabEl = document.getElementById('tamaFab');
+const tamaOverlayEl = document.getElementById('tamaOverlay');
+const tamaPanelEl = document.getElementById('tamaPanel');
+function tamaOpenPanel() {
+    if (tamaPet) { tamaPet = applyTamaDecay(tamaPet); renderTamagotchi(); }
+    tamaOverlayEl.hidden = false;
+    tamaPanelEl.hidden = false;
+    requestAnimationFrame(() => {
+        tamaOverlayEl.classList.add('is-visible');
+        tamaPanelEl.classList.add('is-visible');
+    });
+    tamaFabEl.classList.add('is-open');
+    tamaFabEl.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+}
+function tamaClosePanel() {
+    tamaOverlayEl.classList.remove('is-visible');
+    tamaPanelEl.classList.remove('is-visible');
+    tamaFabEl.classList.remove('is-open');
+    tamaFabEl.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    setTimeout(() => {
+        // не скрываем, если пользователь уже открыл её заново
+        if (!tamaPanelEl.classList.contains('is-visible')) { tamaOverlayEl.hidden = true; tamaPanelEl.hidden = true; }
+    }, 280);
+}
+tamaFabEl.addEventListener('click', () => {
+    tamaPanelEl.classList.contains('is-visible') ? tamaClosePanel() : tamaOpenPanel();
+});
+tamaOverlayEl.addEventListener('click', tamaClosePanel);
+document.getElementById('tamaPanelClose').addEventListener('click', tamaClosePanel);
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && tamaPanelEl.classList.contains('is-visible')) tamaClosePanel();
 });
 
 renderQuickBuy();

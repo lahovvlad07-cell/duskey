@@ -23,6 +23,7 @@ app.get('/health', (req, res) => {
 
 app.use('/', require('./routes/steamTopup'));
 app.use('/', require('./routes/antilopayWebhook'));
+app.use('/', require('./routes/tamagotchi'));
 
 // Страницы редиректа после оплаты (success_url / fail_url из steamTopup.js).
 app.get('/steam/success', (req, res) => {
