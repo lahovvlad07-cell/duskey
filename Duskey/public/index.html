@@ -2238,30 +2238,30 @@ const catalog = [
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=5933050&ai=1108558',
         icon: ICONS.gem, name: 'Robux', meta: 'Roblox Global, 80–22500, нужен логин и пароль',
-        priceLabel: 'от 100 ₽', category: 'topup', hit: false, partner: true,
+        priceLabel: 'от 100 ₽', category: 'topup', hit: false, partner: true, digiselerProductId: 5933050,
     },
     // -- telegram --
     { key: 'stars', icon: ICONS.star, name: 'Telegram Stars', meta: 'Для профиля и каналов', priceLabel: 'от 50 ⭐', category: 'telegram', hit: false, partner: true },
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=4677311&ai=1108558',
         icon: ICONS.crown, name: 'Telegram Premium', meta: '3 / 6 / 12 мес., без входа в аккаунт',
-        priceLabel: 'от 1299 ₽', category: 'telegram', hit: true, partner: true,
+        priceLabel: 'от 1299 ₽', category: 'telegram', hit: true, partner: true, digiselerProductId: 4677311,
     },
     // -- подписки --
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=4023986&ai=1108558',
         icon: ICONS.chip, name: 'Claude AI Pro / Max', meta: 'Подписка 24/7, есть вариант без входа',
-        priceLabel: 'от 1949 ₽', category: 'subs', hit: true, partner: true,
+        priceLabel: 'от 1949 ₽', category: 'subs', hit: true, partner: true, digiselerProductId: 4023986,
     },
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=4362367&ai=1108558',
         icon: ICONS.bot, name: 'ChatGPT Plus / Pro', meta: '5.6, Go, Pro 5x / 20x, Sora — 24/7, без входа',
-        priceLabel: 'от 879 ₽', category: 'subs', hit: false, partner: true,
+        priceLabel: 'от 879 ₽', category: 'subs', hit: false, partner: true, digiselerProductId: 4362367,
     },
     {
         url: 'https://digiseller.me/asp2/pay.asp?id_d=3427397&ai=1108558',
         icon: ICONS.headphones, name: 'Spotify Premium', meta: '1–12 мес., Individual / Duo / Family, нужен вход',
-        priceLabel: 'от 226 ₽', category: 'subs', hit: false, partner: true,
+        priceLabel: 'от 226 ₽', category: 'subs', hit: false, partner: true, digiselerProductId: 3427397,
     },
 ];
 
@@ -4433,6 +4433,38 @@ document.addEventListener('keydown', (e) => {
 renderQuickBuy();
 renderFilters();
 renderCatalog();
+
+// живые цены Digiseller подтягиваются отдельным, не блокирующим запросом
+// уже ПОСЛЕ первой отрисовки — так страница не ждёт ответ стороннего API,
+// чтобы просто показать каталог. Если запрос не удался или для товара
+// не пришла цена — priceLabel остаётся статичным значением из catalog
+// (см. routes/prices.js): ничего не ломается, просто цена не обновится
+// до следующего успешного захода
+async function applyLivePrices() {
+    let prices;
+    try {
+        const res = await fetch('/api/prices');
+        if (!res.ok) return;
+        prices = await res.json();
+    } catch {
+        return; // сеть подвела — тихо остаёмся на статичных ценах
+    }
+    let changed = false;
+    catalog.forEach((item) => {
+        if (!item.digiselerProductId) return;
+        const live = prices[item.digiselerProductId];
+        if (!live) return;
+        const suffix = item.priceLabel.replace(/^от\s*[\d\s]+/i, ''); // сохраняем "₽"/"⭐" и всё, что после числа
+        const nextLabel = `от ${live}${suffix ? ' ' + suffix.trim() : ' ₽'}`;
+        if (nextLabel !== item.priceLabel) {
+            item.priceLabel = nextLabel;
+            changed = true;
+        }
+    });
+    if (changed) renderCatalog();
+}
+applyLivePrices();
+
 </script>
 </body>
 </html>
